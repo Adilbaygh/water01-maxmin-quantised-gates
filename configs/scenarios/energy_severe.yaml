@@ -1,0 +1,5 @@
+meta:
+  name: energy_severe
+  description: "Stress test (energy): 20 W panel; daily PV yield below the daily load of about 121 Wh"
+overrides:
+  pv_peak_w: {value: 20.0, status: assumed, source: "severely undersized panel"}

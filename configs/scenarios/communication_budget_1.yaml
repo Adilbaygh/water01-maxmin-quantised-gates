@@ -1,0 +1,5 @@
+meta:
+  name: communication_budget_1
+  description: "Sensitivity (IoT layer): budget of 1 packet per one-hour window"
+overrides:
+  message_budget_per_window: {value: 1, status: assumed, source: "binding packet budget"}

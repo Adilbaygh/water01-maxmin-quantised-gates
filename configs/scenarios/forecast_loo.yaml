@@ -1,0 +1,5 @@
+meta:
+  name: forecast_loo
+  description: "Exploratory: supply forecast S^lim as the decadal mean of the other nine seasons (leave one year out)"
+overrides:
+  limit_source: {value: "decadal_mean_loo", status: derived, source: "decadal mean of the other nine seasons (leave-one-year-out)"}

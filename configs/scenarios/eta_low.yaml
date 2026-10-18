@@ -1,0 +1,5 @@
+meta:
+  name: eta_low
+  description: "Sensitivity: delivery factor eta = 0.75 (lower quartile of the 2020 steady days)"
+overrides:
+  eta: {value: 0.75, status: assumed, source: "eta_range lower bound"}

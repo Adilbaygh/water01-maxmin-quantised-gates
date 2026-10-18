@@ -1,0 +1,5 @@
+meta:
+  name: sensor_udl
+  description: "Alternative sensor: ultrasonic EM500-UDL C050 (Table 3)"
+overrides:
+  sensor: "EM500-UDL"

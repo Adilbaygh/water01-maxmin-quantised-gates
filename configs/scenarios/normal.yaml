@@ -1,0 +1,4 @@
+meta:
+  name: normal
+  description: "Baseline: recorded supply, actual geometry, baseline IoT parameters"
+overrides: {}

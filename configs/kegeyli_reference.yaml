@@ -1,0 +1,151 @@
+# Water-01: Kegeyli canal (PK 0+00–114+40) and Dustlik hydraulic node — reference configuration.
+#
+# Each parameter:  name: {value: …, status: observed | derived | assumed | setting, source: "…"}
+#   observed — passport, datasheet or operational record;  derived — computed from observed values;
+#   assumed  — assumption (covered by the sensitivity analysis);
+#   setting  — numerical or experimental setting (not model physics).
+# Short form "name: value" — status: setting.
+# Names are unique across the whole file (sections are for grouping only). Scenarios (configs/scenarios/*.yaml)
+# replace only the parameters named under `overrides:`.
+
+meta:
+  name: kegeyli_reference
+  version: 1
+  description: "Kegeyli PK 0+00–114+40 + Dustlik node; actual (surveyed) geometry; baseline scenario"
+
+canal:                       # Section 2.1, Table 1
+  L_m: {value: 11440.0, status: observed, source: "Canal passport, Annex 3"}
+  Q_capacity_m3s: {value: 160.0, status: observed, source: "Canal passport, Annex 3"}
+  b_actual_m: {value: 36.0, status: observed, source: "Canal passport, actual"}
+  b_design_m: {value: 28.0, status: observed, source: "Canal passport, design"}
+  side_slope: {value: 2.0, status: observed, source: "Canal passport"}
+  S0: {value: 1.0e-4, status: observed, source: "Canal passport"}
+  H_max_m: {value: 3.43, status: observed, source: "Canal passport, actual filling depth"}
+  H_norm_m: {value: 3.00, status: observed, source: "Canal passport, actual"}
+  H_min_m: {value: 2.40, status: observed, source: "Canal passport, actual"}
+  n_manning: {value: 0.0185, status: derived, source: "160 m3/s at H_max, actual geometry "}
+  n_design: {value: 0.0193, status: derived, source: "160 m3/s at H_max, design geometry"}
+  n_range: {value: [0.016, 0.025], status: assumed, source: "Chow (1959), clean earth channels"}
+  eta: {value: 0.82, status: observed, source: "2020 dispatcher sheets, median of steady days"}
+  eta_range: {value: [0.75, 0.92], status: assumed, source: "IQR lower bound; passport efficiency upper bound"}
+  demand_eta_reference: {value: 0.82, status: setting, source: "eta used to derive DATA/processed/demand_decadal.csv; demand scales with eta (Equation (1))"}
+  Q_c_m3s: {value: 86.7, status: derived, source: "Manning discharge at H_min"}
+
+id_model:                    # Section 2.4, Equation (8)
+  A_s_m2: {value: 549000.0, status: derived, source: "T(H_norm) x L, actual geometry (upper bound)"}
+  A_s_identified_m2: {value: 371000.0, status: derived, source: "SV step response at H_norm, dQ=±1 m3/s (scripts/identify_id_model.py)"}
+  tau_identified_s: {value: 1530.0, status: derived, source: "same identification; d = ceil(tau/dt)"}
+  id_step_dq_m3s: {value: 1.0, status: setting, source: "identification protocol: inflow step ±dQ at Q_c"}
+  id_duration_h: {value: 6, status: setting, source: "identification protocol: response duration"}
+  id_fit_fraction: {value: 0.5, status: setting, source: "identification protocol: line fitted to the last half"}
+
+node:                        # Section 2.3, Table 2; GTS passport, Annex 4
+  users: {value: ["Abad-Yarmish", "R-1", "Khalkabad-2", "Kanly-Yab", "K-2", "Lower Kegeyli"], status: observed, source: "GTS passport; j = 6 — barrier to lower Kegeyli"}
+  outlet_capacity_m3s: {value: [48.0, 0.5, 1.0, 4.0, 2.0, 120.0], status: observed, source: "GTS passport, Annex 4"}
+  regulator_width_m: {value: [16.0, 1.5, 1.5, 1.5, 1.5], status: observed, source: "GTS passport: gates x width"}
+  barrier_width_m: {value: 40.0, status: observed, source: "GTS passport: 5 x 8.0 m"}
+  regulator_gate_height_m: {value: [2.5, 1.5, 1.5, 1.5, 1.5], status: observed, source: "GTS passport: 8.0 x 2.5 m and 1.5 x 1.5 m gates"}
+  barrier_gate_height_m: {value: 2.5, status: observed, source: "GTS passport: 8.0 x 2.5 m gates"}
+  irrigated_area_ha: {value: [37161.0, 120.0, 637.0, 3110.0, 1027.0, 140545.0], status: observed, source: "GTS passport (Table 2); j = 6 — Kegeyli system minus outlets 1–5"}
+  gate_cd: {value: 0.62, status: assumed, source: "not in passport; tuned/untuned tests"}
+  gate_contraction: {value: 0.61, status: assumed, source: "free-flow contraction coefficient (Henderson 1966)"}
+  regulator_tailwater_m: {value: [1.5, 0.6, 0.6, 0.8, 0.6], status: assumed, source: "not in passport; sensitivity (H6 depends on it)"}
+  lower_reach: {value: {L: 25160.0, b: 36.0, m: 2.0, S0: 1.0e-4, n: 0.0185}, status: assumed, source: "PK 114+40–366+00 rating curve for barrier tail water; geometry as upper reach"}
+  untuned_controller_gate_factor: {value: 0.90, status: assumed, source: "Clemmens et al. (1998) untuned protocol"}
+  untuned_offtake_factor: {value: 1.05, status: assumed, source: "Clemmens et al. (1998) untuned protocol"}
+
+numerics:                    # numerical settings
+  dt_s: {value: 900.0, status: setting, source: "control and plant step, 15 min (Section 2.4)"}
+  steps_per_day: {value: 96, status: setting, source: "86400 / dt_s"}
+  preissmann_theta: {value: 0.6, status: setting, source: "Cunge et al. (1980): 0.55–0.67; 0.5 is neutrally stable"}
+  preissmann_nodes: {value: 58, status: setting, source: "dx ≈ 200 m; grid convergence test N = 21/41/81"}
+  newton_tolerance: {value: 1.0e-9, status: setting, source: "relative step tolerance"}
+  newton_max_iter: {value: 30, status: setting, source: ""}
+  jacobian_fd_step: {value: 1.0e-7, status: setting, source: "relative finite-difference step"}
+  gate_head_regularisation_m: {value: 1.0e-3, status: setting, source: "softplus scale of sqrt(head+): smooth at zero head (Newton)"}
+  lp_primal_feasibility_tolerance: {value: 1.0e-9, status: setting, source: "HiGHS; default 1e-7 made secondary terms invisible"}
+  lp_dual_feasibility_tolerance: {value: 1.0e-9, status: setting, source: "HiGHS"}
+
+simulation:                  # Section 2.10
+  seed: 20261003
+  years: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
+  vegetation_months: [4, 5, 6, 7, 8, 9]
+  season_start: "04-01"
+  season_days: 183
+  demand_variant: {value: "A", status: setting, source: "A — observed Abad-Yarmish share; B — area; C — capacity"}
+  supply_blank_days: {value: "zero", status: assumed, source: "blank entries = no delivery"}
+  supply_scale: {value: 1.0, status: setting, source: "multiplier on the recorded supply (scenarios)"}
+  limit_source: {value: "decadal_mean_2010_2019", status: setting, source: "alternative: limit_2021"}
+  supply_ramp_hours: {value: 0.0, status: setting, source: "0 — step change of S at midnight (baseline); 6 — linear intraday ramp (sensitivity supply_ramp)"}
+  h_init_m: {value: 3.00, status: setting, source: "initial node level = H_norm"}
+
+control:                     # Section 2.4–2.5, 2.8
+  horizon_days: {value: 10, status: setting, source: "daily plan window"}
+  h_min_operating_m: {value: 2.40, status: observed, source: "passport H_min"}
+  freeboard_m: {value: 0.20, status: assumed, source: "freeboard f_b"}
+  gate_rate_fraction_per_step: {value: 0.10, status: assumed, source: "max change of an outlet discharge per step, share of capacity"}
+  command_breakpoints_m: {value: [1.6, 2.0, 2.4, 2.7, 3.0, 3.25, 3.5, 3.8], status: setting, source: "breakpoints of (9)"}
+  execution_lookahead_steps: {value: 8, status: setting, source: "execution LP: rest of the day + 2 h"}
+  execution_fine_steps: {value: 4, status: setting, source: "move blocking: first hour at dt"}
+  execution_block_steps: {value: 4, status: setting, source: "then 1-h blocks"}
+  execution_level_weight: {value: 1.0e-3, status: setting, source: "secondary: |h_L − H_norm|"}
+  execution_slack_weight: {value: 10.0, status: setting, source: "soft level bounds, terminal condition, over-delivery"}
+  execution_next_weight: {value: 1.0e-2, status: setting, source: "share of the look-ahead day"}
+  execution_track_weight: {value: 1.0e-3, status: setting, source: "secondary: uniform delivery relative to plan"}
+  execution_move_weight: {value: 1.0e-4, status: setting, source: "secondary: gate movement"}
+  terminal_band_m: {value: 0.05, status: assumed, source: "|h_L(24:00) − H_norm| ≤ band (no storage borrowing)"}
+  b0_pi_time_constant_s: {value: 7200.0, status: assumed, source: "B0 PI tuning: T_c ≥ 4 tau"}
+  b0_pi_integral_factor: {value: 4.0, status: assumed, source: "B0 PI tuning: T_i = kappa T_c"}
+
+fairness:                    # Section 2.5
+  epsilon_1: {value: 1.0e-6, status: setting, source: "lexicographic tolerance of stage 1, fixed before the runs"}
+  epsilon_2: {value: 1.0e-4, status: setting, source: "weighted-satisfaction units"}
+  weights: {value: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0], status: setting, source: "w_j = 1 in the baseline"}
+
+iot:                         # Section 2.6, Table 3
+  sensor: {value: "EM500-SWL", status: setting, source: "baseline level sensor"}
+  devices:
+    value:
+      EM500-SWL: {name: "Milesight EM500-SWL (L005, 0–5 m)", role: "water-level sensor (baseline)", accuracy_m: 0.025, resolution_m: 0.01, source: "milesight.com/iot/product/lorawan-sensor/em500-swl (accessed 2026-10-04): ±0.5 % FS, 0.01 m"}
+      EM500-UDL: {name: "Milesight EM500-UDL (C050, 0.25–5 m)", role: "ultrasonic level sensor (alternative)", accuracy_m: 0.013, resolution_m: 0.001, source: "milesight.com/iot/product/lorawan-sensor/em500-udl (accessed 2026-10-04): ±(1 + 0.3 %·S) cm, S = 1.0 m assumed"}
+    status: observed
+    source: "manufacturer datasheets"
+  gate_resolution_fraction: {value: 0.001, status: assumed, source: "command step, share of gate travel (actuator not selected)"}
+  gate_deadband_fraction: {value: 0.005, status: assumed, source: "sensitivity 0.0025 / 0.005 / 0.01"}
+  message_window_steps: {value: 4, status: assumed, source: "1-h window"}
+  message_budget_per_window: {value: 8, status: assumed, source: "LoRaWAN regional duty cycle not confirmed"}
+  loss_probability: {value: 0.02, status: assumed, source: "packet loss (sensitivity 0–0.10)"}
+  estimator_blend: {value: 0.5, status: assumed, source: "measurement/prediction weight"}
+  rtu_low_level_interlock_m: {value: 1.30, status: assumed, source: "RTU local fail-safe: all gates close below this measured level; S0·L = 1.14 m + 0.16 m keeps the upstream end wet"}
+  relief_open_level_m: {value: 3.43, status: observed, source: "= H_max (actual filling depth, passport). No emergency spillway at Dustlik (passport Annex 4): excess goes to the next main-canal section via the barrier; RTU opens the barrier fully at this measured level"}
+  relief_release_level_m: {value: 3.33, status: assumed, source: "hysteresis 0.10 m below relief_open_level_m: barrier held fully open until the measured level falls to this value"}
+
+energy:                      # Section 2.6, Equation (16)
+  battery_capacity_wh: {value: 962.0, status: observed, source: "Zemu ZM-H90S100-N datasheet"}
+  pv_peak_w: {value: 100.0, status: observed, source: "Zemu ZM-H90S100-N datasheet"}
+  battery_eta_ch: {value: 0.95, status: assumed, source: "not in datasheet"}
+  battery_eta_dis: {value: 0.95, status: assumed, source: "not in datasheet"}
+  battery_min_wh: {value: 96.2, status: assumed, source: "10 % of capacity"}
+  battery_reserve_wh: {value: 96.2, status: assumed, source: "telemetry + emergency closure reserve"}
+  battery_resume_wh: {value: 288.6, status: assumed, source: "radio switched back on at 30 % of capacity (hysteresis above B_min + B_res = 20 %)"}
+  battery_initial_fraction: {value: 1.0, status: assumed, source: "battery full at season start (1 April)"}
+  pv_performance_ratio: {value: 0.75, status: assumed, source: "panel temperature, soiling, charge-controller losses (typical 0.7–0.8)"}
+  rtu_power_w: {value: 1.45, status: observed, source: "Milesight IoT Controller FAQ (April 2022): UC300 LoRaWAN consumption not more than 1.45 W (upper bound used)"}
+  gateway_power_w: {value: 3.6, status: observed, source: "Milesight UG67 datasheet: typical 3.6 W, max 4.8 W"}
+  message_energy_wh: {value: 1.0e-4, status: assumed, source: "one LoRaWAN uplink/downlink at the node (~0.36 J); the EM500 level sensor has its own battery and is not on the kit"}
+  nasa_power_dir: {value: "DATA/raw/nasa_power", status: setting, source: "POWER API hourly ALLSKY_SFC_SW_DWN, community RE, LST, 1 Apr–30 Sep 2010–2019 (accessed 2026-10-04)"}
+  nasa_power_latitude: {value: 42.649, status: observed, source: "Dustlik node coordinates (KMZ)"}
+  nasa_power_longitude: {value: 59.624, status: observed, source: "Dustlik node coordinates (KMZ)"}
+
+hypotheses:                  # Section 2.9, protocol requirements/hypotheses.md
+  epsilon_lambda: {value: 0.01, status: setting, source: "practical-equivalence margin, satisfaction units"}
+  alpha: {value: 0.05, status: setting, source: "two-sided"}
+  min_sign_share: {value: 0.7, status: setting, source: "correct sign in at least 7/10 years"}
+  bootstrap_block_days: {value: 10, status: setting, source: "moving-block bootstrap within year"}
+  bootstrap_replicates: {value: 10000, status: setting, source: ""}
+  holm_families: {value: {H1: [B0, B1, B2, B3], H5: [B0, B1, B2, B3], H6: [B0, B3]}, status: setting, source: "hypotheses.md §1"}
+
+verification:                # Section 2.10
+  mass_balance_relative_tolerance: {value: 0.001, status: setting, source: ""}
+  grid_convergence_relative_tolerance: {value: 0.005, status: setting, source: ""}
+  oracle_gap_threshold: {value: 0.01, status: setting, source: "practical-equivalence margin of the Oracle gap"}

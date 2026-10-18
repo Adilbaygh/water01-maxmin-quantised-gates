@@ -1,0 +1,4 @@
+meta:
+  name: b3_feedback
+  description: "Exploratory: B3V, proportional rationing with daily volume feedback; baseline parameters"
+overrides: {}

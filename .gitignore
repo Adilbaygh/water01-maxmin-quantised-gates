@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------------------------------------------------
+# Public repository: model code, configuration, open and synthetic inputs, results, tests and the interface.
+# Everything else in the working folder (manuscript, working notes, third-party records) stays local.
+# ---------------------------------------------------------------------------------------------------------------
+
+# Manuscript, templates and working material
+/paper/
+/template/
+/references/
+/Reviewers/
+/archive/
+/build/
+/model/
+/KanalPasport/
+/00_problem.md
+
+# Internal notes; only the hypothesis protocol and its translation are public
+/requirements/*
+!/requirements/hypotheses.md
+!/requirements/hypotheses_en.md
+
+# Input data: the operating records of the irrigation system are third-party data (available to reviewers on
+# request); only the open NASA POWER files and the synthetic inputs are public
+/DATA/*
+!/DATA/raw/
+/DATA/raw/*
+!/DATA/raw/nasa_power/
+!/DATA/synthetic/
+
+# Scripts that build the manuscript or prepare private material
+/scripts/build_methods_docx.py
+/scripts/build_appendix_supp.py
+/scripts/refs.py
+/scripts/schema_offtakes.py
+/scripts/make_review_archive.py
+
+# Run artefacts
+*.error.txt
+/results/verification/rerun/normal/*.tmp
+
+# Python, tests and environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+*.tmp
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Workflow file, to be moved to .github/workflows/tests.yml before the first commit
+/_github_workflow_tests.yml

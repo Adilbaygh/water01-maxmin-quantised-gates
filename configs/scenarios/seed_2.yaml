@@ -1,0 +1,5 @@
+meta:
+  name: seed_2
+  description: "Exploratory: independent random seed for sensor noise and packet loss (2)"
+overrides:
+  seed: 20263003

@@ -1,0 +1,2 @@
+job,max_abs_diff,column,text_columns_equal,lambda_max_abs_diff
+LXB_2018_tuned_iot.csv,0.0,year,True,0.0

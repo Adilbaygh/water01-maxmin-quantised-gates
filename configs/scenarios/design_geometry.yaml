@@ -1,0 +1,16 @@
+meta:
+  name: design_geometry
+  description: "Sensitivity: design geometry (Table 1): b = 28 m, n = 0.0193, design depths"
+overrides:
+  b_actual_m: {value: 28.0, status: observed, source: "Canal passport, design"}
+  n_manning: {value: 0.0193, status: derived, source: "160 m3/s at H_max, design geometry"}
+  H_max_m: {value: 4.00, status: observed, source: "Canal passport, design"}
+  H_norm_m: {value: 3.78, status: observed, source: "Canal passport, design"}
+  H_min_m: {value: 2.80, status: observed, source: "Canal passport, design"}
+  h_init_m: 3.78
+  h_min_operating_m: {value: 2.80, status: observed, source: "design H_min"}
+  A_s_identified_m2: {value: 376000.0, status: derived, source: "Saint-Venant step response, design geometry (Section S2)"}
+  tau_identified_s: {value: 1140.0, status: derived, source: "same identification"}
+  relief_open_level_m: {value: 4.00, status: observed, source: "= design H_max (filling depth); the actual-geometry value 3.43 m lies below the design H_norm of 3.78 m"}
+  relief_release_level_m: {value: 3.90, status: assumed, source: "hysteresis 0.10 m below relief_open_level_m (as in the baseline)"}
+  lower_reach: {value: {L: 25160.0, b: 28.0, m: 2.0, S0: 1.0e-4, n: 0.0193}, status: assumed, source: "barrier tail water: lower reach with the design geometry of the upper reach (baseline rule: geometry as upper reach)"}

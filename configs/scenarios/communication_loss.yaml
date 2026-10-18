@@ -1,0 +1,6 @@
+meta:
+  name: communication_loss
+  description: "Sensitivity (IoT layer): packet loss 10% and a budget of 4 packets per window"
+overrides:
+  loss_probability: {value: 0.10, status: assumed, source: "upper end of sensitivity range"}
+  message_budget_per_window: {value: 4, status: assumed, source: "half the baseline budget"}

@@ -1,0 +1,6 @@
+meta:
+  name: untuned_reverse
+  description: "Exploratory: untuned protocol with the reverse mismatch (controller gate coefficient 1.10, true off-take factor 0.95)"
+overrides:
+  untuned_controller_gate_factor: {value: 1.10, status: assumed, source: "reverse direction of the untuned protocol"}
+  untuned_offtake_factor: {value: 0.95, status: assumed, source: "reverse direction of the untuned protocol"}

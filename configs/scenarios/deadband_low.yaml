@@ -1,0 +1,5 @@
+meta:
+  name: deadband_low
+  description: "Sensitivity (IoT layer): gate deadband 0.25% of the travel"
+overrides:
+  gate_deadband_fraction: {value: 0.0025, status: assumed, source: "sensitivity 0.0025 / 0.005 / 0.01"}

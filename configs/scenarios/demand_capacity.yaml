@@ -1,0 +1,5 @@
+meta:
+  name: demand_capacity
+  description: "Sensitivity: demand variant C, proportional to the passport capacity (Table S3)"
+overrides:
+  demand_variant: {value: "C", status: setting, source: "Table S3"}

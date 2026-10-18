@@ -1,0 +1,5 @@
+meta:
+  name: limit_2021
+  description: "Sensitivity: supply forecast S^lim from the official 2021 decadal limit"
+overrides:
+  limit_source: {value: "limit_2021", status: observed, source: "LimitVegetation2021.xlsx (DATA/processed/limit_2021_kegeyli_decadal.csv)"}
