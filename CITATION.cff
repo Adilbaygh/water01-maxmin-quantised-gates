@@ -7,8 +7,23 @@ license: MIT
 authors:
   - family-names: Kudaybergenov
     given-names: Adilbay
-    affiliation: "Karakalpak State University named after Berdakh, Nukus, Uzbekistan"
+    affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan; National University of Uzbekistan named after Mirzo Ulugbek, Tashkent, Uzbekistan'
     email: q_adilbay@karsu.uz
+  - family-names: Kabulov
+    given-names: Anvar
+    affiliation: 'National University of Uzbekistan named after Mirzo Ulugbek, Tashkent, Uzbekistan'
+  - family-names: Kazimbetova
+    given-names: Mukhabbad
+    affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
+  - family-names: Ametova
+    given-names: Gulsara
+    affiliation: '"Tashkent Institute of Irrigation and Agricultural Mechanization Engineers" National Research University, Tashkent, Uzbekistan'
+  - family-names: Ispanova
+    given-names: Jadira
+    affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
+  - family-names: Shikhiyev
+    given-names: Rakhim
+    affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
 keywords:
   - lexicographic allocation
   - max-min fairness
@@ -22,5 +37,15 @@ preferred-citation:
   authors:
     - family-names: Kudaybergenov
       given-names: Adilbay
+    - family-names: Kabulov
+      given-names: Anvar
+    - family-names: Kazimbetova
+      given-names: Mukhabbad
+    - family-names: Ametova
+      given-names: Gulsara
+    - family-names: Ispanova
+      given-names: Jadira
+    - family-names: Shikhiyev
+      given-names: Rakhim
   journal: "Water"
   year: 2026

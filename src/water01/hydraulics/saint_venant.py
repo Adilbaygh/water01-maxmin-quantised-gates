@@ -7,7 +7,6 @@
 For a prismatic section ∂(g I1)/∂x = g A ∂h/∂x, so (3) is equivalent to the form given in Section 2.3.
 Discretisation: hydraulics.preissmann.
 """
-import numpy as np
 from scipy.integrate import solve_ivp
 
 G = 9.81

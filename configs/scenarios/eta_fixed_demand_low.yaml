@@ -1,0 +1,7 @@
+meta:
+  name: eta_fixed_demand_low
+  description: "Sensitivity: eta = 0.75 in plant and controller, demand at the node kept at its reference value (not scaled with eta)"
+overrides:
+  eta: {value: 0.75, status: assumed, source: "eta_range lower bound"}
+additions:
+  demand_scales_with_eta: {value: false, status: setting, source: "demand at the node fixed; only the conveyance loss changes"}

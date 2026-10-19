@@ -101,7 +101,7 @@
   [
    "H1",
    "LXB − B0, B1, B2, B3; daily *λ*; four chains (16 comparisons)",
-   "+0.000 to +0.489; superior in 15, non-inferior in 1 (B3, tuned phys)",
+   "+0.000 to +0.489; superior in 15, non-inferior in 1 (B3, tuned phys); seasons as units: superior in 14",
    "Supported in all 4 chains"
   ],
   [
@@ -119,7 +119,7 @@
   [
    "H4",
    "Mean daily Π{~1~} of LXB, tuned (secondary: untuned)",
-   "+0.060 [+0.021, +0.059], circular blocks [+0.037, +0.086]; untuned +0.097; 10/10",
+   "+0.060 [+0.021, +0.059], season bootstrap [+0.045, +0.072]; untuned +0.097; 10/10",
    "Supported"
   ],
   [
@@ -156,7 +156,8 @@
    "Estimate [95% CI]",
    "p (Holm)",
    "Sign",
-   "Decision"
+   "Decision",
+   "Seasons as units: p (Holm)"
   ],
   [
    "H1",
@@ -166,7 +167,8 @@
    "+0.015 [+0.012, +0.018]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -176,7 +178,8 @@
    "+0.193 [+0.174, +0.212]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -186,7 +189,8 @@
    "+0.024 [+0.019, +0.029]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -196,7 +200,8 @@
    "+6.1 × 10{^−6^} [−3.1 × 10{^−5^}, +4.2 × 10{^−5^}]",
    "< 0.001",
    "6/10",
-   "Non-inferior"
+   "Non-inferior",
+   "0.779"
   ],
   [
    "H5",
@@ -206,7 +211,8 @@
    "−0.015 [−0.018, −0.012]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -216,7 +222,8 @@
    "−0.193 [−0.212, −0.174]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -226,7 +233,8 @@
    "−0.024 [−0.029, −0.019]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -236,7 +244,8 @@
    "−6.1 × 10{^−6^} [−4.2 × 10{^−5^}, +3.1 × 10{^−5^}]",
    "< 0.001",
    "6/10",
-   "Descriptive"
+   "Descriptive",
+   "0.779"
   ],
   [
    "H6",
@@ -246,7 +255,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H6",
@@ -256,7 +266,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H1",
@@ -266,7 +277,8 @@
    "+0.319 [+0.278, +0.380]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -276,7 +288,8 @@
    "+0.482 [+0.448, +0.548]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -286,7 +299,8 @@
    "+0.021 [+0.017, +0.026]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -296,7 +310,8 @@
    "+0.489 [+0.456, +0.557]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H5",
@@ -306,7 +321,8 @@
    "−0.319 [−0.380, −0.278]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -316,7 +332,8 @@
    "−0.482 [−0.548, −0.448]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -326,7 +343,8 @@
    "−0.021 [−0.026, −0.017]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -336,7 +354,8 @@
    "−0.489 [−0.557, −0.456]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H6",
@@ -346,7 +365,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H6",
@@ -356,7 +376,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H1",
@@ -366,7 +387,8 @@
    "+0.022 [+0.018, +0.026]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -376,7 +398,8 @@
    "+0.115 [+0.096, +0.133]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -386,7 +409,8 @@
    "+0.029 [+0.024, +0.035]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -396,7 +420,8 @@
    "+0.149 [+0.119, +0.175]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H5",
@@ -406,7 +431,8 @@
    "−0.022 [−0.026, −0.018]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -416,7 +442,8 @@
    "−0.115 [−0.133, −0.096]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -426,7 +453,8 @@
    "−0.029 [−0.035, −0.024]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -436,7 +464,8 @@
    "−0.149 [−0.175, −0.119]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H6",
@@ -446,7 +475,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H6",
@@ -456,7 +486,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H1",
@@ -466,7 +497,8 @@
    "+0.280 [+0.242, +0.341]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -476,7 +508,8 @@
    "+0.392 [+0.349, +0.458]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H1",
@@ -486,7 +519,8 @@
    "+0.012 [+0.008, +0.018]",
    "< 0.001",
    "7/10",
-   "Superior"
+   "Superior",
+   "0.111 (non-inferior)"
   ],
   [
    "H1",
@@ -496,7 +530,8 @@
    "+0.217 [+0.181, +0.263]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "0.008"
   ],
   [
    "H5",
@@ -506,7 +541,8 @@
    "−0.280 [−0.341, −0.242]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -516,7 +552,8 @@
    "−0.392 [−0.458, −0.349]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H5",
@@ -526,7 +563,8 @@
    "−0.012 [−0.018, −0.008]",
    "< 0.001",
    "7/10",
-   "Descriptive"
+   "Descriptive",
+   "0.111 (inconclusive)"
   ],
   [
    "H5",
@@ -536,7 +574,8 @@
    "−0.217 [−0.263, −0.181]",
    "< 0.001",
    "10/10",
-   "Descriptive"
+   "Descriptive",
+   "0.008"
   ],
   [
    "H6",
@@ -546,7 +585,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H6",
@@ -556,7 +596,8 @@
    "+0.000",
    "—",
    "—",
-   "Not testable"
+   "Not testable",
+   "—"
   ],
   [
    "H2",
@@ -566,7 +607,8 @@
    "−0.199 [−0.260, −0.160]",
    "< 0.001",
    "10/10",
-   "Supported"
+   "Supported",
+   "0.002"
   ],
   [
    "H2",
@@ -576,7 +618,8 @@
    "+0.078 [+0.070, +0.089]",
    "< 0.001",
    "0/10",
-   "Rejected"
+   "Rejected",
+   "0.002"
   ],
   [
    "H2",
@@ -586,7 +629,8 @@
    "−0.289 [−0.352, −0.257]",
    "< 0.001",
    "10/10",
-   "Supported"
+   "Supported",
+   "0.002"
   ],
   [
    "H3",
@@ -596,7 +640,8 @@
    "−4.8 × 10{^−8^} [−1.9 × 10{^−7^}, +1.9 × 10{^−7^}]",
    "< 0.001",
    "8/10",
-   "Inconclusive"
+   "Inconclusive",
+   "0.799"
   ],
   [
    "H3",
@@ -606,7 +651,8 @@
    "−5.5 × 10{^−7^} [−6.2 × 10{^−7^}, −5.1 × 10{^−7^}]",
    "< 0.001",
    "0/10",
-   "Non-inferior"
+   "Non-inferior",
+   "0.002"
   ],
   [
    "H3",
@@ -616,7 +662,8 @@
    "−4.6 × 10{^−7^} [−5.3 × 10{^−7^}, −4.3 × 10{^−7^}]",
    "< 0.001",
    "0/10",
-   "Non-inferior"
+   "Non-inferior",
+   "0.002"
   ],
   [
    "H4",
@@ -626,7 +673,8 @@
    "+0.060 [+0.021, +0.059]",
    "< 0.001",
    "10/10",
-   "Supported"
+   "Supported",
+   "0.002"
   ],
   [
    "H4",
@@ -636,7 +684,8 @@
    "+0.097 [+0.050, +0.099]",
    "< 0.001",
    "10/10",
-   "Supported"
+   "Supported",
+   "0.002"
   ],
   [
    "H7a",
@@ -646,7 +695,8 @@
    "−0.544 [−0.622, −0.484]",
    "< 0.001",
    "10/10",
-   "Supported"
+   "Supported",
+   "0.002"
   ],
   [
    "H7b",
@@ -656,7 +706,8 @@
    "+0.079 [+0.044, +0.131]",
    "—",
    "10/10",
-   "Supported"
+   "Supported",
+   "—"
   ]
  ],
  "table_posthoc": [
@@ -664,145 +715,244 @@
    "Comparison",
    "Chain",
    "Estimate [95% CI]",
-   "95% CI, circular blocks",
    "p (Holm)",
    "Sign",
-   "Decision"
+   "Decision",
+   "Seasons as units: 95% CI; p (Holm)"
   ],
   [
    "LXB − B3V",
    "tuned/phys",
    "−1.6 × 10{^−5^} [−4.4 × 10{^−5^}, +4.9 × 10{^−6^}]",
-   "[−4.1 × 10{^−5^}, +6.9 × 10{^−6^}]",
    "< 0.001",
    "3/10",
-   "Non-inferior"
+   "Non-inferior",
+   "[−4.1 × 10{^−5^}, +6.2 × 10{^−6^}]; 0.535"
   ],
   [
    "LXB − B3V",
    "tuned/IoT",
    "+0.001 [+0.0002, +0.002]",
-   "[+0.0002, +0.002]",
    "0.598",
    "6/10",
-   "Non-inferior"
+   "Non-inferior",
+   "[−1.8 × 10{^−5^}, +0.002]; 0.115"
   ],
   [
    "B3V − LXB",
    "tuned/IoT",
    "−0.001 [−0.002, −0.0002]",
-   "[−0.002, −0.0002]",
    "0.598",
    "4/10",
-   "Non-inferior"
+   "Non-inferior",
+   "[−0.002, +1.8 × 10{^−5^}]; 0.115"
   ],
   [
    "LXB − B3V",
    "untuned/phys",
    "+0.014 [+0.004, +0.022]",
-   "[+0.006, +0.025]",
    "< 0.001",
    "9/10",
-   "Superior"
+   "Superior",
+   "[+0.007, +0.022]; 0.004"
   ],
   [
    "LXB − B3V",
    "untuned/IoT",
    "+0.087 [+0.067, +0.110]",
-   "[+0.066, +0.109]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "[+0.073, +0.103]; 0.004"
   ],
   [
    "LXB-DA − LXB",
    "tuned/IoT",
    "+0.046 [+0.014, +0.050]",
-   "[+0.026, +0.071]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "[+0.032, +0.059]; 0.002"
   ],
   [
    "Π{~1~}(LXB-DA) − Π{~1~}(LXB)",
    "tuned/IoT",
    "−0.055 [−0.055, −0.018]",
-   "[−0.081, −0.033]",
    "< 0.001",
    "10/10",
-   "Supported"
+   "Supported",
+   "[−0.067, −0.040]; 0.002"
   ],
   [
    "LXB-DA − LXB",
    "untuned/IoT",
    "+0.059 [+0.024, +0.063]",
-   "[+0.037, +0.085]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "[+0.043, +0.073]; 0.002"
   ],
   [
    "Π{~1~}(LXB-DA) − Π{~1~}(LXB)",
    "untuned/IoT",
    "−0.092 [−0.095, −0.047]",
-   "[−0.122, −0.064]",
    "< 0.001",
    "10/10",
-   "Supported"
+   "Supported",
+   "[−0.111, −0.068]; 0.002"
   ],
   [
    "LXB − B0",
    "untuned, reverse/phys",
    "−0.066 [−0.076, −0.058]",
-   "[−0.075, −0.057]",
    "< 0.001",
    "1/10",
-   "Rejected"
+   "Rejected",
+   "[−0.090, −0.042]; 0.008"
   ],
   [
    "LXB − B3",
    "untuned, reverse/phys",
    "−1.0 × 10{^−4^} [−1.3 × 10{^−4^}, −7.7 × 10{^−5^}]",
-   "[−1.3 × 10{^−4^}, −7.8 × 10{^−5^}]",
    "< 0.001",
    "0/10",
-   "Non-inferior"
+   "Non-inferior",
+   "[−1.2 × 10{^−4^}, −8.2 × 10{^−5^}]; 0.006"
   ],
   [
    "LXB − B3V",
    "untuned, reverse/phys",
    "+5.1 × 10{^−6^} [+1.0 × 10{^−6^}, +1.1 × 10{^−5^}]",
-   "[+2.1 × 10{^−7^}, +9.9 × 10{^−6^}]",
    "< 0.001",
    "8/10",
-   "Superior (below *ε*{~λ~})"
+   "Superior (below *ε*{~λ~})",
+   "[+8.8 × 10{^−7^}, +9.2 × 10{^−6^}]; 0.049"
   ],
   [
    "LXB − B0",
    "untuned, reverse/IoT",
    "+0.239 [+0.196, +0.296]",
-   "[+0.191, +0.289]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "[+0.163, +0.326]; 0.006"
   ],
   [
    "LXB − B3",
    "untuned, reverse/IoT",
    "+0.661 [+0.651, +0.715]",
-   "[+0.624, +0.696]",
    "< 0.001",
    "10/10",
-   "Superior"
+   "Superior",
+   "[+0.589, +0.725]; 0.006"
   ],
   [
    "LXB − B3V",
    "untuned, reverse/IoT",
    "+0.0005 [+3.9 × 10{^−6^}, +0.001]",
-   "[−0.0001, +0.001]",
    "0.022",
    "6/10",
-   "Non-inferior"
+   "Non-inferior",
+   "[−0.0002, +0.001]; 0.250"
+  ],
+  [
+   "LXB-F − LXB",
+   "tuned/phys",
+   "−2.5 × 10{^−7^} [−5.6 × 10{^−6^}, +4.9 × 10{^−6^}]",
+   "< 0.001",
+   "4/10",
+   "Non-inferior",
+   "[−1.8 × 10{^−6^}, +9.5 × 10{^−7^}]; 0.768"
+  ],
+  [
+   "LXB-F − LXB",
+   "tuned/IoT",
+   "+4.5 × 10{^−5^} [−7.4 × 10{^−6^}, +1.5 × 10{^−4^}]",
+   "0.109",
+   "3/10",
+   "Non-inferior",
+   "[−3.0 × 10{^−5^}, +1.5 × 10{^−4^}]; 0.469"
+  ],
+  [
+   "LXB-F − LXB",
+   "untuned/phys",
+   "+0.001 [+0.001, +0.001]",
+   "< 0.001",
+   "10/10",
+   "Superior (below *ε*{~λ~})",
+   "[+0.001, +0.001]; 0.002"
+  ],
+  [
+   "LXB-F − LXB",
+   "untuned/IoT",
+   "+0.018 [+0.011, +0.023]",
+   "< 0.001",
+   "10/10",
+   "Superior",
+   "[+0.012, +0.024]; 0.002"
+  ],
+  [
+   "B3V-DA − B3V",
+   "tuned/IoT",
+   "+0.044 [+0.012, +0.048]",
+   "< 0.001",
+   "10/10",
+   "Superior",
+   "[+0.031, +0.055]; 0.002"
+  ],
+  [
+   "LXB-DA − B3V-DA",
+   "tuned/IoT",
+   "+0.003 [+0.002, +0.003]",
+   "< 0.001",
+   "10/10",
+   "Superior (below *ε*{~λ~})",
+   "[+0.002, +0.005]; 0.002"
+  ],
+  [
+   "B3V-DA − B3V",
+   "untuned/IoT",
+   "+0.031 [+0.005, +0.033]",
+   "0.003",
+   "10/10",
+   "Superior",
+   "[+0.020, +0.043]; 0.002"
+  ],
+  [
+   "LXB-DA − B3V-DA",
+   "untuned/IoT",
+   "+0.115 [+0.090, +0.135]",
+   "< 0.001",
+   "10/10",
+   "Superior",
+   "[+0.094, +0.134]; 0.002"
+  ],
+  [
+   "LXB − B3",
+   "tuned/phys (7.5 min)",
+   "−3.7 × 10{^−5^} [−7.1 × 10{^−5^}, −1.0 × 10{^−5^}]",
+   "< 0.001",
+   "5/10",
+   "Non-inferior",
+   "[−8.7 × 10{^−5^}, +7.8 × 10{^−6^}]; 0.203"
+  ],
+  [
+   "LXB − B3",
+   "tuned/IoT (7.5 min)",
+   "+0.592 [+0.551, +0.651]",
+   "< 0.001",
+   "10/10",
+   "Superior",
+   "[+0.486, +0.704]; 0.002"
+  ],
+  [
+   "LXB-DA − LXB",
+   "tuned/IoT (7.5 min)",
+   "+0.011 [+0.003, +0.011]",
+   "< 0.001",
+   "10/10",
+   "Superior",
+   "[+0.008, +0.013]; 0.002"
   ]
  ],
  "tableS7": [
@@ -855,7 +1005,7 @@
    "—"
   ],
   [
-   "Blank supply days filled with nearest record",
+   "Blank supply days filled with the last recorded value",
    "LXB, B0, B3; phys, IoT",
    "0.773",
    "7.2",
@@ -1214,6 +1364,30 @@
   "H4_circ_hi": 0.0859153977584554,
   "H4_season_lo": 0.0447947641119932,
   "H4_season_hi": 0.0724622267515751,
+  "H4_cal_lo": 0.0242312467945418,
+  "H4_cal_hi": 0.0629533621612102,
+  "seasontest_changed": 2,
+  "seasontest_changed_list": [
+   "H1 LXB − B2 untuned/iot: superior -> non-inferior",
+   "H5 gap_LXB − gap_B2 untuned/iot: supported -> inconclusive"
+  ],
+  "st_H1_B0_tuned_phys_p": 0.0078125,
+  "st_H1_B1_tuned_phys_p": 0.0078125,
+  "st_H1_B2_tuned_phys_p": 0.0078125,
+  "st_H1_B3_tuned_phys_p": 0.779296875,
+  "st_H1_B0_tuned_iot_p": 0.0078125,
+  "st_H1_B1_tuned_iot_p": 0.0078125,
+  "st_H1_B2_tuned_iot_p": 0.0078125,
+  "st_H1_B3_tuned_iot_p": 0.0078125,
+  "st_H1_B0_untuned_phys_p": 0.0078125,
+  "st_H1_B1_untuned_phys_p": 0.0078125,
+  "st_H1_B2_untuned_phys_p": 0.0078125,
+  "st_H1_B3_untuned_phys_p": 0.0078125,
+  "st_H1_B0_untuned_iot_p": 0.0078125,
+  "st_H1_B1_untuned_iot_p": 0.0078125,
+  "st_H1_B2_untuned_iot_p": 0.111328125,
+  "st_H1_B3_untuned_iot_p": 0.0078125,
+  "H1_superior_seasons": 14,
   "tests_n": 50,
   "H1_chains_supported": 4,
   "H2_est": -0.1991515344653549,
@@ -1237,7 +1411,7 @@
   "H7b_est": 0.0790293662844627,
   "H7b_lo": 0.0444525557567981,
   "H7b_hi": 0.1311438137126947,
-  "sens_lam_iot_min_excl_severe": 0.7497727200706602,
+  "sens_lam_iot_min_excl_severe": 0.6896401949600505,
   "sens_lam_iot_max": 0.7984082416823659,
   "sens_supply_ramp_lam_iot": 0.7626282190905972,
   "sens_supply_ramp_lam_phys": 0.810728625183837,
@@ -1247,7 +1421,6 @@
   "sens_supply_ramp_d_B3_iot": 0.3033251730828721,
   "sens_supply_ramp_radio_off_share": 0.0,
   "sens_supply_ramp_battery_min_wh": 845.9029822368398,
-  "sens_supply_ramp_dropped_share": 0.0207540437678401,
   "sens_limit_2021_lam_iot": 0.7644989705594051,
   "sens_limit_2021_lam_phys": 0.8116593633176978,
   "sens_limit_2021_pi1_ratio": 0.0581036761105327,
@@ -1256,7 +1429,6 @@
   "sens_limit_2021_d_B3_iot": 0.4888299703738143,
   "sens_limit_2021_radio_off_share": 0.0,
   "sens_limit_2021_battery_min_wh": 845.9032980263132,
-  "sens_limit_2021_dropped_share": 0.020771416440772,
   "sens_demand_area_lam_iot": 0.7643125101289601,
   "sens_demand_area_lam_phys": 0.8116620656202487,
   "sens_demand_area_pi1_ratio": 0.0583365386863379,
@@ -1265,7 +1437,6 @@
   "sens_demand_area_d_B3_iot": 0.6220157102645136,
   "sens_demand_area_radio_off_share": 0.0,
   "sens_demand_area_battery_min_wh": 845.9032980263132,
-  "sens_demand_area_dropped_share": 0.0209662413609782,
   "sens_demand_capacity_lam_iot": 0.7984082416823659,
   "sens_demand_capacity_lam_phys": 0.8116612380577878,
   "sens_demand_capacity_pi1_ratio": 0.0163282361581474,
@@ -1274,7 +1445,6 @@
   "sens_demand_capacity_d_B3_iot": 0.1418111179014675,
   "sens_demand_capacity_radio_off_share": 0.0,
   "sens_demand_capacity_battery_min_wh": 845.9032980263132,
-  "sens_demand_capacity_dropped_share": 0.0215165774632709,
   "sens_eta_low_lam_iot": 0.7642777974382049,
   "sens_eta_low_lam_phys": 0.8116706401176188,
   "sens_eta_low_pi1_ratio": 0.058389253395375,
@@ -1283,7 +1453,6 @@
   "sens_eta_low_d_B3_iot": 0.747574565090559,
   "sens_eta_low_radio_off_share": 0.0,
   "sens_eta_low_battery_min_wh": 845.9032980263132,
-  "sens_eta_low_dropped_share": 0.0205834196544925,
   "sens_eta_high_lam_iot": 0.7649151260668074,
   "sens_eta_high_lam_phys": 0.8116484061997506,
   "sens_eta_high_pi1_ratio": 0.0575782318747533,
@@ -1292,7 +1461,6 @@
   "sens_eta_high_d_B3_iot": 0.3683932065492521,
   "sens_eta_high_radio_off_share": 0.0,
   "sens_eta_high_battery_min_wh": 845.9031927631554,
-  "sens_eta_high_dropped_share": 0.0209151015462423,
   "sens_design_geometry_lam_iot": 0.7644860241415525,
   "sens_design_geometry_lam_phys": 0.8116784755234263,
   "sens_design_geometry_pi1_ratio": 0.0581418046738775,
@@ -1301,7 +1469,6 @@
   "sens_design_geometry_d_B3_iot": 0.7573805782377256,
   "sens_design_geometry_radio_off_share": 0.0,
   "sens_design_geometry_battery_min_wh": 845.9026664473663,
-  "sens_design_geometry_dropped_share": 0.0214188355942104,
   "sens_deadband_low_lam_iot": 0.7881759637432556,
   "sens_deadband_low_lam_phys": 0.8116617347228133,
   "sens_deadband_low_pi1_ratio": 0.0289354172740177,
@@ -1310,7 +1477,6 @@
   "sens_deadband_low_d_B3_iot": 0.3028229367600563,
   "sens_deadband_low_radio_off_share": 0.0,
   "sens_deadband_low_battery_min_wh": 845.9030874999976,
-  "sens_deadband_low_dropped_share": 0.0202827162282426,
   "sens_deadband_high_lam_iot": 0.7497727200706602,
   "sens_deadband_high_lam_phys": 0.8116617347228133,
   "sens_deadband_high_pi1_ratio": 0.0762497626838211,
@@ -1319,7 +1485,6 @@
   "sens_deadband_high_d_B3_iot": 0.7497727200706602,
   "sens_deadband_high_radio_off_share": 0.0,
   "sens_deadband_high_battery_min_wh": 845.9035085526289,
-  "sens_deadband_high_dropped_share": 0.0210736152641321,
   "sens_energy_moderate_lam_iot": 0.7651010239681736,
   "sens_energy_moderate_lam_phys": 0.8116617347228133,
   "sens_energy_moderate_pi1_ratio": 0.0573646739309947,
@@ -1328,7 +1493,6 @@
   "sens_energy_moderate_d_B3_iot": 0.4894836190140763,
   "sens_energy_moderate_radio_off_share": 0.0129610655737704,
   "sens_energy_moderate_battery_min_wh": 77.65840407891196,
-  "sens_energy_moderate_dropped_share": 0.0210136726516379,
   "sens_energy_severe_lam_iot": 0.6389098911174821,
   "sens_energy_severe_lam_phys": 0.8116617347228133,
   "sens_energy_severe_pi1_ratio": 0.2128372402135316,
@@ -1337,7 +1501,6 @@
   "sens_energy_severe_d_B3_iot": 0.2628068546631503,
   "sens_energy_severe_radio_off_share": 0.3341188524590164,
   "sens_energy_severe_battery_min_wh": 159.99372184206842,
-  "sens_energy_severe_dropped_share": 0.0197468771900894,
   "sens_communication_loss_lam_iot": 0.7650709376960076,
   "sens_communication_loss_lam_phys": 0.8116617347228133,
   "sens_communication_loss_pi1_ratio": 0.0574017414319977,
@@ -1346,7 +1509,9 @@
   "sens_communication_loss_d_B3_iot": 0.4886364635368443,
   "sens_communication_loss_radio_off_share": 0.0,
   "sens_communication_loss_battery_min_wh": 845.9036138157867,
-  "sens_communication_loss_dropped_share": 0.1020137784843667,
+  "sens_communication_loss_blocked_share": 0.0,
+  "sens_communication_loss_lost_share": 0.1020137784843667,
+  "sens_communication_loss_failed_share": 0.1020137784843667,
   "sens_communication_budget_2_lam_iot": 0.7647999932093749,
   "sens_communication_budget_2_lam_phys": 0.8116617347228133,
   "sens_communication_budget_2_pi1_ratio": 0.0577355559695591,
@@ -1355,7 +1520,9 @@
   "sens_communication_budget_2_d_B3_iot": 0.4866368037512963,
   "sens_communication_budget_2_radio_off_share": 0.0,
   "sens_communication_budget_2_battery_min_wh": 845.9038243421023,
-  "sens_communication_budget_2_dropped_share": 0.1980551833144349,
+  "sens_communication_budget_2_blocked_share": 0.1500788505344314,
+  "sens_communication_budget_2_lost_share": 0.0214754492663986,
+  "sens_communication_budget_2_failed_share": 0.1683312890602184,
   "sens_communication_budget_1_lam_iot": 0.7582931148227703,
   "sens_communication_budget_1_lam_phys": 0.8116617347228133,
   "sens_communication_budget_1_pi1_ratio": 0.0657522926324335,
@@ -1364,7 +1531,75 @@
   "sens_communication_budget_1_d_B3_iot": 0.4662667717187027,
   "sens_communication_budget_1_radio_off_share": 0.0,
   "sens_communication_budget_1_battery_min_wh": 845.9036138157867,
-  "sens_communication_budget_1_dropped_share": 0.9806185753747226,
+  "sens_communication_budget_1_blocked_share": 0.4899411017438503,
+  "sens_communication_budget_1_lost_share": 0.0200606801612099,
+  "sens_communication_budget_1_failed_share": 0.5001732301651461,
+  "sens_eta_true_low_lam_iot": 0.7299804524009215,
+  "sens_eta_true_low_lam_phys": 0.795428075118276,
+  "sens_eta_true_low_pi1_ratio": 0.0822797494388449,
+  "sens_eta_true_low_pi1_median": 0.006757113559442,
+  "sens_eta_true_low_d_B0_iot": 0.288447003950315,
+  "sens_eta_true_low_d_B3_iot": 0.3568854213120239,
+  "sens_eta_true_low_radio_off_share": 0.0,
+  "sens_eta_true_low_battery_min_wh": 845.9029822368398,
+  "sens_eta_true_low_blocked_share": 0.0,
+  "sens_eta_true_low_lost_share": 0.0208675424192665,
+  "sens_eta_true_low_failed_share": 0.0208675424192665,
+  "sens_eta_fixed_demand_low_lam_iot": 0.7487582732421412,
+  "sens_eta_fixed_demand_low_lam_phys": 0.7959705867757064,
+  "sens_eta_fixed_demand_low_pi1_ratio": 0.0593141434092577,
+  "sens_eta_fixed_demand_low_pi1_median": 0.0047451959553146,
+  "sens_eta_fixed_demand_low_d_B0_iot": 0.3242271463631226,
+  "sens_eta_fixed_demand_low_d_B3_iot": 0.4557324759872045,
+  "sens_eta_fixed_demand_low_radio_off_share": 0.0,
+  "sens_eta_fixed_demand_low_battery_min_wh": 845.9031927631554,
+  "sens_eta_fixed_demand_low_blocked_share": 0.0,
+  "sens_eta_fixed_demand_low_lost_share": 0.0203447941262088,
+  "sens_eta_fixed_demand_low_failed_share": 0.0203447941262088,
+  "sens_rating_outlets_lam_iot": 0.6896401949600505,
+  "sens_rating_outlets_lam_phys": 0.730384408240334,
+  "sens_rating_outlets_pi1_ratio": 0.0557846153622663,
+  "sens_rating_outlets_pi1_median": 0.0047480070353938,
+  "sens_rating_outlets_d_B0_iot": 0.2462428741570918,
+  "sens_rating_outlets_d_B3_iot": 0.2528946214969433,
+  "sens_rating_outlets_radio_off_share": 0.0,
+  "sens_rating_outlets_battery_min_wh": 845.9029822368398,
+  "sens_rating_outlets_blocked_share": 0.0,
+  "sens_rating_outlets_lost_share": 0.0204304245283018,
+  "sens_rating_outlets_failed_share": 0.0204304245283018,
+  "sens_tailwater_high_lam_iot": 0.7653717379139534,
+  "sens_tailwater_high_lam_phys": 0.8116616627237726,
+  "sens_tailwater_high_pi1_ratio": 0.057031059782323,
+  "sens_tailwater_high_pi1_median": 0.0029660353573618,
+  "sens_tailwater_high_d_B0_iot": 0.3062222784237886,
+  "sens_tailwater_high_d_B3_iot": 0.3535996068626204,
+  "sens_tailwater_high_radio_off_share": 0.0,
+  "sens_tailwater_high_battery_min_wh": 845.9031927631554,
+  "sens_tailwater_high_blocked_share": 0.0,
+  "sens_tailwater_high_lost_share": 0.0218250927259908,
+  "sens_tailwater_high_failed_share": 0.0218250927259908,
+  "sens_sensor_bias_pos_lam_iot": 0.7605981402603262,
+  "sens_sensor_bias_pos_lam_phys": 0.8116617347228133,
+  "sens_sensor_bias_pos_pi1_ratio": 0.062912408307539,
+  "sens_sensor_bias_pos_pi1_median": 0.0089383871838038,
+  "sens_sensor_bias_pos_d_B0_iot": 0.3153390244039904,
+  "sens_sensor_bias_pos_d_B3_iot": 0.7301036841769595,
+  "sens_sensor_bias_pos_radio_off_share": 0.0,
+  "sens_sensor_bias_pos_battery_min_wh": 845.9032980263132,
+  "sens_sensor_bias_pos_blocked_share": 0.0,
+  "sens_sensor_bias_pos_lost_share": 0.020198341550874,
+  "sens_sensor_bias_pos_failed_share": 0.020198341550874,
+  "sens_sensor_bias_neg_lam_iot": 0.7662762677259255,
+  "sens_sensor_bias_neg_lam_phys": 0.8116617347228133,
+  "sens_sensor_bias_neg_pi1_ratio": 0.0559167262115506,
+  "sens_sensor_bias_neg_pi1_median": 0.0001605765790328,
+  "sens_sensor_bias_neg_d_B0_iot": 0.32078363342993,
+  "sens_sensor_bias_neg_d_B3_iot": 0.3010037992188332,
+  "sens_sensor_bias_neg_radio_off_share": 0.0,
+  "sens_sensor_bias_neg_battery_min_wh": 845.9031927631554,
+  "sens_sensor_bias_neg_blocked_share": 0.0,
+  "sens_sensor_bias_neg_lost_share": 0.0199846708490646,
+  "sens_sensor_bias_neg_failed_share": 0.0199846708490646,
   "sens_supply_ramp_LXB_lam_iot": 0.7626282190905972,
   "sens_supply_ramp_LXB_lam_phys": 0.810728625183837,
   "sens_supply_ramp_B0_lam_iot": 0.4454132289664692,
@@ -1449,6 +1684,42 @@
   "sens_communication_budget_1_B0_lam_phys": 0.7966490722972555,
   "sens_communication_budget_1_B3_lam_iot": 0.2920263431040677,
   "sens_communication_budget_1_B3_lam_phys": 0.8116556354284875,
+  "sens_eta_true_low_LXB_lam_iot": 0.7299804524009215,
+  "sens_eta_true_low_LXB_lam_phys": 0.795428075118276,
+  "sens_eta_true_low_B0_lam_iot": 0.4415334484506063,
+  "sens_eta_true_low_B0_lam_phys": 0.7740227873193288,
+  "sens_eta_true_low_B3_lam_iot": 0.3730950310888975,
+  "sens_eta_true_low_B3_lam_phys": 0.5489655197613821,
+  "sens_eta_fixed_demand_low_LXB_lam_iot": 0.7487582732421412,
+  "sens_eta_fixed_demand_low_LXB_lam_phys": 0.7959705867757064,
+  "sens_eta_fixed_demand_low_B0_lam_iot": 0.4245311268790185,
+  "sens_eta_fixed_demand_low_B0_lam_phys": 0.7793353397661976,
+  "sens_eta_fixed_demand_low_B3_lam_iot": 0.2930257972549366,
+  "sens_eta_fixed_demand_low_B3_lam_phys": 0.7959769813098809,
+  "sens_rating_outlets_LXB_lam_iot": 0.6896401949600505,
+  "sens_rating_outlets_LXB_lam_phys": 0.730384408240334,
+  "sens_rating_outlets_B0_lam_iot": 0.4433973208029586,
+  "sens_rating_outlets_B0_lam_phys": 0.7763260088693626,
+  "sens_rating_outlets_B3_lam_iot": 0.4367455734631071,
+  "sens_rating_outlets_B3_lam_phys": 0.7303603857384374,
+  "sens_tailwater_high_LXB_lam_iot": 0.7653717379139534,
+  "sens_tailwater_high_LXB_lam_phys": 0.8116616627237726,
+  "sens_tailwater_high_B0_lam_iot": 0.4591494594901648,
+  "sens_tailwater_high_B0_lam_phys": 0.7966492824935147,
+  "sens_tailwater_high_B3_lam_iot": 0.411772131051333,
+  "sens_tailwater_high_B3_lam_phys": 0.8116499145030149,
+  "sens_sensor_bias_pos_LXB_lam_iot": 0.7605981402603262,
+  "sens_sensor_bias_pos_LXB_lam_phys": 0.8116617347228133,
+  "sens_sensor_bias_pos_B0_lam_iot": 0.4452591158563357,
+  "sens_sensor_bias_pos_B0_lam_phys": 0.7966490722972555,
+  "sens_sensor_bias_pos_B3_lam_iot": 0.0304944560833667,
+  "sens_sensor_bias_pos_B3_lam_phys": 0.8116556354284875,
+  "sens_sensor_bias_neg_LXB_lam_iot": 0.7662762677259255,
+  "sens_sensor_bias_neg_LXB_lam_phys": 0.8116617347228133,
+  "sens_sensor_bias_neg_B0_lam_iot": 0.4454926342959956,
+  "sens_sensor_bias_neg_B0_lam_phys": 0.7966490722972555,
+  "sens_sensor_bias_neg_B3_lam_iot": 0.4652724685070923,
+  "sens_sensor_bias_neg_B3_lam_phys": 0.8116556354284875,
   "sens_d_B0_min": 0.1730453622562111,
   "sens_d_B0_max": 0.7497727200706602,
   "sens_d_B3_min": 0.1418111179014675,
@@ -1474,6 +1745,83 @@
   "floor_price_B1": 0.543519304424889,
   "shortage_days_LXB_phys": 650,
   "shortage_share_LXB_phys": 0.3551912568306011,
+  "floorc_excluded_user_days": 100,
+  "floorc_excluded_pairs_share": 0.010928961748633892,
+  "floorc_lam_LXB_phys": 0.8116617347228134,
+  "floorc_lam_LXB_iot": 0.7975587897777302,
+  "floorc_price_LXB": 0.017375397091867917,
+  "floorc_lam_B0_phys": 0.7966490722972555,
+  "floorc_lam_B0_iot": 0.481458611233767,
+  "floorc_price_B0": 0.39564529982391133,
+  "floorc_lam_B3_phys": 0.8116556354284874,
+  "floorc_lam_B3_iot": 0.2756690001855908,
+  "floorc_price_B3": 0.6603621189175133,
+  "floorc_lam_B2_phys": 0.7880344077964261,
+  "floorc_lam_B2_iot": 0.7760885772057626,
+  "floorc_price_B2": 0.015159021576313499,
+  "floorc_lam_Oracle_phys": 0.8116399962024894,
+  "floorc_lam_Oracle_iot": 0.7980059374772599,
+  "floorc_price_Oracle": 0.016798160254571835,
+  "floorc_lam_B1_phys": 0.6189703528753701,
+  "floorc_lam_B1_iot": 0.28254801722092077,
+  "floorc_price_B1": 0.543519304424889,
+  "phi_ratio_sensor": 0.00012473647027333784,
+  "phi_ratio_quantisation": 0.05798660533664166,
+  "phi_ratio_communication": -8.632616704349544e-06,
+  "phi_ratio_energy": 0.0,
+  "phi_ratio_price": 0.05810270919021065,
+  "phi_ratio_seasonal_sum_mean": 0.05819921706281843,
+  "day_coalitions_date": "2014-06-06",
+  "day_coalitions_lam_phys": 8.06428187757079e-06,
+  "day_coalition_phys_price": 0.0,
+  "day_coalition_S_price": -34.91544203057373,
+  "day_coalition_Q_price": 1.0,
+  "day_coalition_C_price": -8.192689466296336,
+  "day_coalition_E_price": 0.0,
+  "day_coalition_SQ_price": -10.049313610210257,
+  "day_coalition_SC_price": -34.92951312513897,
+  "day_coalition_SE_price": -34.91544203057373,
+  "day_coalition_QC_price": 1.0,
+  "day_coalition_QE_price": 1.0,
+  "day_coalition_CE_price": -8.192689466296336,
+  "day_coalition_SQC_price": 1.0,
+  "day_coalition_SQE_price": -10.049313610210257,
+  "day_coalition_SCE_price": -34.92951312513897,
+  "day_coalition_QCE_price": 1.0,
+  "day_coalition_SQCE_price": 1.0,
+  "over_LXB_R1_demand_m3_day_early": 25.92,
+  "over_LXB_R1_delivered_m3_day_early": 0.0,
+  "over_LXB_R1_ratio_mean_early": 0.0,
+  "over_LXB_R1_ratio_max_early": 0.0,
+  "over_LXB_R1_ratio_min_early": 0.0,
+  "over_LXB_R1_excess_share": 0.001124607168416029,
+  "over_LXB_R1_days_above_1p05": 10.0,
+  "over_LXB_R1_early_days_delivered": 0.0,
+  "over_LXB_R1_delivered_m3_day_early_pos": NaN,
+  "over_LXB_R1_delivered_m3_day_early_pos_min": NaN,
+  "over_LXB_R1_delivered_m3_day_early_max": 0.0,
+  "over_B3V_R1_demand_m3_day_early": 25.92,
+  "over_B3V_R1_delivered_m3_day_early": 0.0,
+  "over_B3V_R1_ratio_mean_early": 0.0,
+  "over_B3V_R1_ratio_max_early": 0.0,
+  "over_B3V_R1_ratio_min_early": 0.0,
+  "over_B3V_R1_excess_share": 0.0017611252849805466,
+  "over_B3V_R1_days_above_1p05": 5.0,
+  "over_B3V_R1_early_days_delivered": 0.0,
+  "over_B3V_R1_delivered_m3_day_early_pos": NaN,
+  "over_B3V_R1_delivered_m3_day_early_pos_min": NaN,
+  "over_B3V_R1_delivered_m3_day_early_max": 0.0,
+  "over_LXB-DA_R1_demand_m3_day_early": 25.92,
+  "over_LXB-DA_R1_delivered_m3_day_early": 41.48575077862975,
+  "over_LXB-DA_R1_ratio_mean_early": 1.60053050843479,
+  "over_LXB-DA_R1_ratio_max_early": 2.792195616891334,
+  "over_LXB-DA_R1_ratio_min_early": 0.0,
+  "over_LXB-DA_R1_excess_share": 0.006380931759402796,
+  "over_LXB-DA_R1_days_above_1p05": 188.0,
+  "over_LXB-DA_R1_early_days_delivered": 77.0,
+  "over_LXB-DA_R1_delivered_m3_day_early_pos": 53.877598413804876,
+  "over_LXB-DA_R1_delivered_m3_day_early_pos_min": 51.103145848565305,
+  "over_LXB-DA_R1_delivered_m3_day_early_max": 72.37371038982337,
   "lam_B3V_tuned_phys": 0.8116775059938202,
   "lam_B3V_tuned_iot": 0.7634679582918781,
   "lam_B3V_untuned_phys": 0.7947271326097287,
@@ -1495,65 +1843,119 @@
   "hmin_mean_LXB-DA_tuned_iot": 2.9853787453304244,
   "r_R1_LXB-DA_untuned_iot": 0.8406079796072324,
   "hmin_mean_LXB-DA_untuned_iot": 2.9144312763077163,
+  "expl_season_E1_tuned_phys_B3V": [
+   -4.123222849163418e-05,
+   6.201696224911766e-06,
+   0.53515625,
+   "non-inferior"
+  ],
   "expl_circ_E1_tuned_phys_B3V": [
-   -4.114833997119902e-05,
-   6.9381304130871874e-06
+   -4.123222849163418e-05,
+   6.201696224911766e-06
   ],
   "expl_E1_B3V_tuned_phys_est": -1.5771271006748006e-05,
   "expl_E1_B3V_tuned_phys_lo": -4.397795848067347e-05,
   "expl_E1_B3V_tuned_phys_hi": 4.925320535103816e-06,
+  "expl_season_E1_tuned_iot_B3V": [
+   -1.7788002074656185e-05,
+   0.0021465607529724,
+   0.115234375,
+   "non-inferior"
+  ],
   "expl_circ_E1_tuned_iot_B3V": [
-   0.0001873091316752,
-   0.0019643036863797
+   -1.7788002074656185e-05,
+   0.0021465607529724
   ],
   "expl_E1_B3V_tuned_iot_est": 0.0010340306975138,
   "expl_E1_B3V_tuned_iot_lo": 0.0002326573445522,
   "expl_E1_B3V_tuned_iot_hi": 0.0020309070382743,
+  "expl_season_E1_untuned_phys_B3V": [
+   0.0068508452392608,
+   0.0215982385615979,
+   0.00390625,
+   "superior"
+  ],
   "expl_circ_E1_untuned_phys_B3V": [
-   0.0055832048629821,
-   0.0246856652941893
+   0.0068508452392608,
+   0.0215982385615979
   ],
   "expl_E1_B3V_untuned_phys_est": 0.014373911893791,
   "expl_E1_B3V_untuned_phys_lo": 0.0043257095258685,
   "expl_E1_B3V_untuned_phys_hi": 0.0224596076036261,
+  "expl_season_E1_untuned_iot_B3V": [
+   0.0729707027843357,
+   0.1025266974383336,
+   0.00390625,
+   "superior"
+  ],
   "expl_circ_E1_untuned_iot_B3V": [
-   0.0662811687249257,
-   0.1091560953510705
+   0.0729707027843357,
+   0.1025266974383336
   ],
   "expl_E1_B3V_untuned_iot_est": 0.0869866378493951,
   "expl_E1_B3V_untuned_iot_lo": 0.0668920261357764,
   "expl_E1_B3V_untuned_iot_hi": 0.109592205287149,
+  "expl_season_E2_tuned_iot_LXB": [
+   0.0321578496799889,
+   0.0587765068365857,
+   0.001953125,
+   "superior"
+  ],
   "expl_circ_E2_tuned_iot_LXB": [
-   0.0256600869057558,
-   0.0705090081046076
+   0.0321578496799889,
+   0.0587765068365857
   ],
   "expl_E2_LXB_tuned_iot_est": 0.0462375220626823,
   "expl_E2_LXB_tuned_iot_lo": 0.0136515098142468,
   "expl_E2_LXB_tuned_iot_hi": 0.0499173862100055,
+  "expl_season_E3_tuned_iot_Π1(LXB": [
+   -0.067097581485657,
+   -0.0404306370478926,
+   0.001953125,
+   "supported"
+  ],
   "expl_circ_E3_tuned_iot_Π1(LXB": [
-   -0.0805600911616522,
-   -0.0326045688650376
+   -0.067097581485657,
+   -0.0404306370478926
   ],
   "expl_E3_Π1(LXB_tuned_iot_est": -0.0550048727820606,
   "expl_E3_Π1(LXB_tuned_iot_lo": -0.055442074692292,
   "expl_E3_Π1(LXB_tuned_iot_hi": -0.0180611231051744,
+  "expl_season_E2_untuned_iot_LXB": [
+   0.0425549127727917,
+   0.0733198141066801,
+   0.001953125,
+   "superior"
+  ],
   "expl_circ_E2_untuned_iot_LXB": [
-   0.0372951639708332,
-   0.0848264766332244
+   0.0425549127727917,
+   0.0733198141066801
   ],
   "expl_E2_LXB_untuned_iot_est": 0.0592575230922685,
   "expl_E2_LXB_untuned_iot_lo": 0.023867670928769,
   "expl_E2_LXB_untuned_iot_hi": 0.0629620422113008,
+  "expl_season_E3_untuned_iot_Π1(LXB": [
+   -0.1114808016205857,
+   -0.0684822594590017,
+   0.001953125,
+   "supported"
+  ],
   "expl_circ_E3_untuned_iot_Π1(LXB": [
-   -0.1219110534977663,
-   -0.0644336322213016
+   -0.1114808016205857,
+   -0.0684822594590017
   ],
   "expl_E3_Π1(LXB_untuned_iot_est": -0.0917497645961662,
   "expl_E3_Π1(LXB_untuned_iot_lo": -0.0949304680236392,
   "expl_E3_Π1(LXB_untuned_iot_hi": -0.0468224732038301,
+  "expl_season_E4_tuned_iot_LXB": [
+   -0.0021465607529724,
+   1.7788002074656093e-05,
+   0.115234375,
+   "non-inferior"
+  ],
   "expl_circ_E4_tuned_iot_LXB": [
-   -0.0019643036863797,
-   -0.0001873091316752
+   -0.0021465607529724,
+   1.7788002074656093e-05
   ],
   "expl_E4_LXB_tuned_iot_est": -0.0010340306975138,
   "expl_E4_LXB_tuned_iot_lo": -0.0020309070382743,
@@ -1570,48 +1972,227 @@
    -2.5658718768471904e-06,
    "non-inferior"
   ],
+  "expl_season_E6_untuned_phys_B0": [
+   -0.0897538152803663,
+   -0.0418803724997923,
+   0.0078125,
+   "rejected"
+  ],
   "expl_circ_E6_untuned_phys_B0": [
-   -0.0753312727413684,
-   -0.0574158172199465
+   -0.0897538152803663,
+   -0.0418803724997923
   ],
   "expl_E6_B0_untuned_phys_est": -0.0663660090642046,
   "expl_E6_B0_untuned_phys_lo": -0.0758184090856859,
   "expl_E6_B0_untuned_phys_hi": -0.0579887129357738,
+  "expl_season_E6_untuned_phys_B3": [
+   -0.0001213264643644,
+   -8.194272584057868e-05,
+   0.005859375,
+   "non-inferior"
+  ],
   "expl_circ_E6_untuned_phys_B3": [
-   -0.000126727975942,
-   -7.791769944718528e-05
+   -0.0001213264643644,
+   -8.194272584057868e-05
   ],
   "expl_E6_B3_untuned_phys_est": -0.0001023456652253,
   "expl_E6_B3_untuned_phys_lo": -0.0001270734641996,
   "expl_E6_B3_untuned_phys_hi": -7.734825612797113e-05,
+  "expl_season_E6_untuned_phys_B3V": [
+   8.770707769727046e-07,
+   9.186562374176703e-06,
+   0.048828125,
+   "superior"
+  ],
   "expl_circ_E6_untuned_phys_B3V": [
-   2.122995390224101e-07,
-   9.922347521132108e-06
+   8.770707769727046e-07,
+   9.186562374176703e-06
   ],
   "expl_E6_B3V_untuned_phys_est": 5.102187862916015e-06,
   "expl_E6_B3V_untuned_phys_lo": 1.020184359574173e-06,
   "expl_E6_B3V_untuned_phys_hi": 1.0732172902602936e-05,
+  "expl_season_E6_untuned_iot_B0": [
+   0.162562589611534,
+   0.3257813014800956,
+   0.005859375,
+   "superior"
+  ],
   "expl_circ_E6_untuned_iot_B0": [
-   0.1906412405655239,
-   0.2889715132629425
+   0.162562589611534,
+   0.3257813014800956
   ],
   "expl_E6_B0_untuned_iot_est": 0.2392203163875209,
   "expl_E6_B0_untuned_iot_lo": 0.1963969305869375,
   "expl_E6_B0_untuned_iot_hi": 0.2962236087182317,
+  "expl_season_E6_untuned_iot_B3": [
+   0.5890242405728072,
+   0.7250514805734174,
+   0.005859375,
+   "superior"
+  ],
   "expl_circ_E6_untuned_iot_B3": [
-   0.624300960113771,
-   0.6957320814406508
+   0.5890242405728072,
+   0.7250514805734174
   ],
   "expl_E6_B3_untuned_iot_est": 0.6610868838638334,
   "expl_E6_B3_untuned_iot_lo": 0.6507200699938042,
   "expl_E6_B3_untuned_iot_hi": 0.7148732442901782,
+  "expl_season_E6_untuned_iot_B3V": [
+   -0.0001754717716134,
+   0.0012242743929207,
+   0.25,
+   "non-inferior"
+  ],
   "expl_circ_E6_untuned_iot_B3V": [
-   -9.382048969783208e-05,
-   0.0010665042548121
+   -0.0001754717716134,
+   0.0012242743929207
   ],
   "expl_E6_B3V_untuned_iot_est": 0.0004819721318281,
   "expl_E6_B3V_untuned_iot_lo": 3.895323663341355e-06,
   "expl_E6_B3V_untuned_iot_hi": 0.0011513702980197,
+  "expl_season_E7_tuned_phys_LXB": [
+   -1.800605401881833e-06,
+   9.520245608071446e-07,
+   0.767578125,
+   "non-inferior"
+  ],
+  "expl_circ_E7_tuned_phys_LXB": [
+   -1.800605401881833e-06,
+   9.520245608071446e-07
+  ],
+  "expl_E7_LXB_tuned_phys_est": -2.516815190284174e-07,
+  "expl_E7_LXB_tuned_phys_lo": -5.579590991902534e-06,
+  "expl_E7_LXB_tuned_phys_hi": 4.927189486132735e-06,
+  "expl_season_E7_tuned_iot_LXB": [
+   -3.0284379089259563e-05,
+   0.0001456558824965,
+   0.46875,
+   "non-inferior"
+  ],
+  "expl_circ_E7_tuned_iot_LXB": [
+   -3.0284379089259563e-05,
+   0.0001456558824965
+  ],
+  "expl_E7_LXB_tuned_iot_est": 4.523887735643988e-05,
+  "expl_E7_LXB_tuned_iot_lo": -7.409476391220704e-06,
+  "expl_E7_LXB_tuned_iot_hi": 0.0001467290784474,
+  "expl_season_E7_untuned_phys_LXB": [
+   0.0006905858704478,
+   0.0014919342984206,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E7_untuned_phys_LXB": [
+   0.0006905858704478,
+   0.0014919342984206
+  ],
+  "expl_E7_LXB_untuned_phys_est": 0.0010975587334764,
+  "expl_E7_LXB_untuned_phys_lo": 0.0008888876818017,
+  "expl_E7_LXB_untuned_phys_hi": 0.0013423030583735,
+  "expl_season_E7_untuned_iot_LXB": [
+   0.011816408155028,
+   0.0240878835339401,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E7_untuned_iot_LXB": [
+   0.011816408155028,
+   0.0240878835339401
+  ],
+  "expl_E7_LXB_untuned_iot_est": 0.0179472271308257,
+  "expl_E7_LXB_untuned_iot_lo": 0.0112161248037874,
+  "expl_E7_LXB_untuned_iot_hi": 0.0226675792587002,
+  "expl_season_E8_tuned_iot_B3V": [
+   0.031128431472762,
+   0.055382582080328,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E8_tuned_iot_B3V": [
+   0.031128431472762,
+   0.055382582080328
+  ],
+  "expl_E8_B3V_tuned_iot_est": 0.0444257164083023,
+  "expl_E8_B3V_tuned_iot_lo": 0.0124429256893259,
+  "expl_E8_B3V_tuned_iot_hi": 0.0481665529110888,
+  "expl_season_E8_tuned_iot_B3V-DA": [
+   0.001642063959684,
+   0.0045766236751997,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E8_tuned_iot_B3V-DA": [
+   0.001642063959684,
+   0.0045766236751997
+  ],
+  "expl_E8_B3V-DA_tuned_iot_est": 0.0028458363518938,
+  "expl_E8_B3V-DA_tuned_iot_lo": 0.001705822361132,
+  "expl_E8_B3V-DA_tuned_iot_hi": 0.00343500782163,
+  "expl_season_E8_untuned_iot_B3V": [
+   0.0198874468687321,
+   0.0427837432457539,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E8_untuned_iot_B3V": [
+   0.0198874468687321,
+   0.0427837432457539
+  ],
+  "expl_E8_B3V_untuned_iot_est": 0.0312623712217043,
+  "expl_E8_B3V_untuned_iot_lo": 0.0049193991065424,
+  "expl_E8_B3V_untuned_iot_hi": 0.0327124097155059,
+  "expl_season_E8_untuned_iot_B3V-DA": [
+   0.0940206784617043,
+   0.1336515874760562,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E8_untuned_iot_B3V-DA": [
+   0.0940206784617043,
+   0.1336515874760562
+  ],
+  "expl_E8_B3V-DA_untuned_iot_est": 0.1149817897199593,
+  "expl_E8_B3V-DA_untuned_iot_lo": 0.0903243419952394,
+  "expl_E8_B3V-DA_untuned_iot_hi": 0.1353721064273028,
+  "expl_season_E9_tuned_phys (7.5 min)_B3": [
+   -8.72108857773692e-05,
+   7.770168059097007e-06,
+   0.203125,
+   "non-inferior"
+  ],
+  "expl_circ_E9_tuned_phys (7.5 min)_B3": [
+   -8.72108857773692e-05,
+   7.770168059097007e-06
+  ],
+  "expl_E9_B3_tuned_phys (7.5 min)_est": -3.740240329199125e-05,
+  "expl_E9_B3_tuned_phys (7.5 min)_lo": -7.084712092905828e-05,
+  "expl_E9_B3_tuned_phys (7.5 min)_hi": -1.034664937982022e-05,
+  "expl_season_E9_tuned_iot (7.5 min)_B3": [
+   0.4856571189753315,
+   0.7043158402387587,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E9_tuned_iot (7.5 min)_B3": [
+   0.4856571189753315,
+   0.7043158402387587
+  ],
+  "expl_E9_B3_tuned_iot (7.5 min)_est": 0.5922110547972312,
+  "expl_E9_B3_tuned_iot (7.5 min)_lo": 0.551124232305009,
+  "expl_E9_B3_tuned_iot (7.5 min)_hi": 0.6514722777543969,
+  "expl_season_E9_tuned_iot (7.5 min)_LXB": [
+   0.0077536963296637,
+   0.0134815177575612,
+   0.001953125,
+   "superior"
+  ],
+  "expl_circ_E9_tuned_iot (7.5 min)_LXB": [
+   0.0077536963296637,
+   0.0134815177575612
+  ],
+  "expl_E9_LXB_tuned_iot (7.5 min)_est": 0.0108165557743907,
+  "expl_E9_LXB_tuned_iot (7.5 min)_lo": 0.0029751787975014,
+  "expl_E9_LXB_tuned_iot (7.5 min)_hi": 0.0111406963426064,
   "seed1_price": 0.0576310200796899,
   "seed2_price": 0.0577824881409541,
   "seed3_price": 0.0571645323443142,
@@ -1625,6 +2206,46 @@
   "block_20_changed": 0,
   "circular_bootstrap_changed": 0,
   "season_bootstrap_changed": 0,
+  "x_final_share_LXB-F_tuned_phys_lam": 0.8116614830412944,
+  "x_final_share_LXB-F_tuned_phys_d_LXB": -2.51681518959046e-07,
+  "x_final_share_LXB-F_tuned_phys_r_R1": 0.8120941864359783,
+  "x_final_share_LXB-F_tuned_iot_lam": 0.7645472278667482,
+  "x_final_share_LXB-F_tuned_iot_d_LXB": 4.523887735641274e-05,
+  "x_final_share_LXB-F_tuned_iot_r_R1": 0.7661682335290331,
+  "x_final_share_LXB-F_tuned_phystoiot_price_ratio": 0.0580466809857837,
+  "x_final_share_LXB-F_untuned_phys_lam": 0.8101986032369963,
+  "x_final_share_LXB-F_untuned_phys_d_LXB": 0.0010975587334766,
+  "x_final_share_LXB-F_untuned_phys_r_R1": 0.8210867104854467,
+  "x_final_share_LXB-F_untuned_iot_lam": 0.7675294722795131,
+  "x_final_share_LXB-F_untuned_iot_d_LXB": 0.0179472271308258,
+  "x_final_share_LXB-F_untuned_iot_r_R1": 0.7786792956501465,
+  "x_final_share_LXB-F_untuned_phystoiot_price_ratio": 0.0526650265589285,
+  "x_b3v_deadband_B3V-DA_tuned_iot_lam_iot": 0.8078936747001804,
+  "x_b3v_deadband_B3V-DA_tuned_iot_d_B3V": 0.0444257164083023,
+  "x_b3v_deadband_B3V-DA_tuned_iot_d_LXB-DA": 0.0028458363518938,
+  "x_b3v_deadband_B3V-DA_tuned_iot_r_R1": 0.815157950454342,
+  "x_b3v_deadband_B3V-DA_untuned_iot_lam_iot": 0.6938579785209963,
+  "x_b3v_deadband_B3V-DA_untuned_iot_d_B3V": 0.0312623712217043,
+  "x_b3v_deadband_B3V-DA_untuned_iot_d_LXB-DA": 0.1149817897199593,
+  "x_b3v_deadband_B3V-DA_untuned_iot_r_R1": 0.8382083260419051,
+  "x_dt_450_LXB_tuned_phys_lam": 0.8116490639412521,
+  "x_dt_450_LXB_tuned_phys_d_15min": -1.2670781561197051e-05,
+  "x_dt_450_LXB_tuned_phys_r_R1": 0.8121015763417887,
+  "x_dt_450_LXB_tuned_iot_lam": 0.8003224914125738,
+  "x_dt_450_LXB_tuned_iot_d_15min": 0.035820502423182,
+  "x_dt_450_LXB_tuned_iot_r_R1": 0.8034721146405306,
+  "x_dt_450_B3_tuned_phys_lam": 0.8116864663445443,
+  "x_dt_450_B3_tuned_phys_d_15min": 3.08309160568232e-05,
+  "x_dt_450_B3_tuned_phys_r_R1": 0.8116920652424814,
+  "x_dt_450_B3_tuned_iot_lam": 0.2081114366153425,
+  "x_dt_450_B3_tuned_iot_d_15min": -0.0675575635702482,
+  "x_dt_450_B3_tuned_iot_r_R1": 0.2228777948405701,
+  "x_dt_450_LXB-DA_tuned_iot_lam": 0.8111390471869645,
+  "x_dt_450_LXB-DA_tuned_iot_d_15min": 0.0003995361348902,
+  "x_dt_450_LXB-DA_tuned_iot_r_R1": 0.813700192700111,
+  "x_dt_450_LXB_tuned_phystoiot_price_ratio": 0.0139550121251641,
+  "x_dt_450_B3_tuned_phystoiot_price_ratio": 0.743606127187781,
+  "x_dt_450_LXB-DA_tuned_phystoiot_price_ratio": 0.0006283710250475,
   "reverse_lam_LXB_phys": 0.7010348909101388,
   "reverse_lam_B0_phys": 0.7674008999743434,
   "reverse_lam_B3_phys": 0.7011372365753642,

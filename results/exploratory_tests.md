@@ -21,3 +21,14 @@
 | E6 | LXB − B0 | untuned (reverse)/iot | +0.2392 | [+0.1964, +0.2962] | 7.7e-59 | 1.0 | superior |
 | E6 | LXB − B3 | untuned (reverse)/iot | +0.6611 | [+0.6507, +0.7149] | 2.7e-273 | 1.0 | superior |
 | E6 | LXB − B3V | untuned (reverse)/iot | +0.000482 | [+3.895e-06, +0.001151] | 0.022 | 0.6 | non-inferior |
+| E7 | LXB-F − LXB | tuned/phys | -2.517e-07 | [-5.58e-06, +4.927e-06] | 2.3e-05 | 0.4 | non-inferior |
+| E7 | LXB-F − LXB | tuned/iot | +4.524e-05 | [-7.409e-06, +0.0001467] | 0.11 | 0.3 | non-inferior |
+| E7 | LXB-F − LXB | untuned/phys | +0.001098 | [+0.0008889, +0.001342] | 2.8e-62 | 1.0 | superior |
+| E7 | LXB-F − LXB | untuned/iot | +0.01795 | [+0.01122, +0.02267] | 7.3e-78 | 1.0 | superior |
+| E8 | B3V-DA − B3V | tuned/iot | +0.04443 | [+0.01244, +0.04817] | 7.9e-113 | 1.0 | superior |
+| E8 | LXB-DA − B3V-DA | tuned/iot | +0.002846 | [+0.001706, +0.003435] | 6.1e-23 | 1.0 | superior |
+| E8 | B3V-DA − B3V | untuned/iot | +0.03126 | [+0.004919, +0.03271] | 0.0028 | 1.0 | superior |
+| E8 | LXB-DA − B3V-DA | untuned/iot | +0.115 | [+0.09032, +0.1354] | 5.2e-135 | 1.0 | superior |
+| E9 | LXB − B3 | tuned/phys (7.5 min) | -3.74e-05 | [-7.085e-05, -1.035e-05] | 5.7e-32 | 0.5 | non-inferior |
+| E9 | LXB − B3 | tuned/iot (7.5 min) | +0.5922 | [+0.5511, +0.6515] | 1.5e-284 | 1.0 | superior |
+| E9 | LXB-DA − LXB | tuned/iot (7.5 min) | +0.01082 | [+0.002975, +0.01114] | 1.7e-140 | 1.0 | superior |

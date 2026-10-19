@@ -4,7 +4,7 @@ Values live in the configuration, not in the code: configs/kegeyli_reference.yam
 gives convenient access to the active configuration: value(name), PARAMETERS[name] (Parameter: value, status,
 source), USERS.
 """
-from .config import STATUSES, Parameter, active, value  # noqa: F401
+from .config import STATUSES, Parameter, active, optional, value  # noqa: F401
 
 
 class _Registry:

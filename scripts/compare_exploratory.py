@@ -8,9 +8,13 @@ These comparisons were not pre-specified and are reported as exploratory.
       rule is inactive under ideal execution and LXB-DA then coincides with LXB;
   E4  B3V - LXB, lambda, "increase", tuned/iot: the reverse direction of E1;
   E5  H3 with stricter tolerances: lambda with epsilon_1 = 1e-6 and Z2 (sum of r_j) with epsilon_2 = 1e-4;
-  E6  reverse gate mismatch (untuned_reverse): LXB - B0, B3, B3V, lambda, "increase", untuned/phys and untuned/iot.
+  E6  reverse gate mismatch (untuned_reverse): LXB - B0, B3, B3V, lambda, "increase", untuned/phys and untuned/iot;
+  E7  execution on the final daily share: LXB-F - LXB, lambda, "increase", every variant (final_share);
+  E8  pulse rule on B3V: B3V-DA - B3V and LXB-DA - B3V-DA, lambda, "increase", tuned/iot and untuned/iot;
+  E9  command step of 7.5 min (dt_450, tuned): LXB - B3 (phys and iot) and LXB-DA - LXB (iot).
+E7-E9 are computed only when the results of the corresponding cases are present.
 Output: results/exploratory_tests[_<scheme>].csv and .md
-Usage: python scripts/compare_exploratory.py [--bootstrap block|circular|season]
+Usage: python scripts/compare_exploratory.py [--bootstrap block|circular|season|calendar] [--inference daily|season]
 """
 import argparse
 import sys
@@ -32,9 +36,11 @@ SOURCES = {("LXB", "normal"): "experiment/normal", ("B3", "normal"): "experiment
 REVERSE = "exploratory/untuned_reverse"
 
 
-def read(folder, pattern="*.csv"):
+def read(folder, pattern="*.csv", optional=False):
     files = sorted((RES / folder).glob(pattern))
     if not files:
+        if optional:
+            return None
         sys.exit(f"No results in results/{folder}")
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
     df["tuned"] = df.tuned.astype(str); df["iot"] = df.iot.astype(str)
@@ -55,11 +61,14 @@ def lam_diff(df, a, b, tuned, iot):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--bootstrap", choices=("block", "circular", "season"), default="block",
+    ap.add_argument("--bootstrap", choices=("block", "circular", "season", "calendar"), default="block",
                     help="bootstrap scheme of the daily comparisons (default: block, as for the hypothesis tests)")
+    ap.add_argument("--inference", choices=("daily", "season"), default="daily",
+                    help="daily Wilcoxon test (default) or exact sign-flip test of the seasonal means")
     args = ap.parse_args()
-    EH.SCHEME = args.bootstrap
-    suffix = "" if args.bootstrap == "block" else f"_{args.bootstrap}"
+    EH.SCHEME = args.bootstrap; EH.TEST = "wilcoxon" if args.inference == "daily" else "season"
+    suffix = ("" if args.bootstrap == "block" else f"_{args.bootstrap}") + \
+        ("" if args.inference == "daily" else "_seasontest")
     load_config()
     seed = value("seed")
     df = load(); rows = []
@@ -89,7 +98,7 @@ def main():
     for col, diff, eps in (("lambda", (f["lambda"] - g["lambda"]).to_numpy(), value("epsilon_1")),         # E5
                            ("Z2 (sum)", (f[rc].sum(axis=1) - g[rc].sum(axis=1)).to_numpy(), value("epsilon_2"))):
         for r in evaluate_family({"LXB-noS3": diff}, f.year.to_numpy(), "increase", eps=eps, seed=seed,
-                                  scheme=args.bootstrap):
+                                  scheme=args.bootstrap, test=EH.TEST):
             rows.append(dict(hypothesis="E5", comparison=f"{col}: LXB − LXB-noS3", variant="tuned/phys",
                              role="exploratory", estimate=r.estimate, ci_low=r.ci_low, ci_high=r.ci_high,
                              p_raw=r.p_raw, p_holm=r.p_holm, sign_share=r.sign_share, n_days=len(diff),
@@ -100,6 +109,37 @@ def main():
         for b in ("B0", "B3", "B3V"):
             d[b], yrs = lam_diff(rev, "LXB", b, "untuned", iot)
         run_family(rows, "E6", "LXB − ", f"untuned (reverse)/{iot}", d, yrs, "increase", seed, role="exploratory")
+    fs = read("exploratory/final_share", "LXB-F_*.csv", optional=True)                # E7
+    if fs is not None:
+        both = pd.concat([df, fs], ignore_index=True)
+        for tuned, iot in VARIANTS:
+            if not ((fs.tuned == tuned) & (fs.iot == iot)).any():
+                continue
+            d, yrs = lam_diff(both, "LXB-F", "LXB", tuned, iot)
+            run_family(rows, "E7", "LXB-F − ", f"{tuned}/{iot}", {"LXB": d}, yrs, "increase", seed, role="exploratory",
+                       note="execution LP on the final daily share")
+    bd = read("exploratory/b3v_deadband", "B3V-DA_*.csv", optional=True)            # E8
+    if bd is not None:
+        both = pd.concat([df, bd], ignore_index=True)
+        for tuned in ("tuned", "untuned"):
+            if not ((bd.tuned == tuned) & (bd.iot == "iot")).any():
+                continue
+            d1, yrs = lam_diff(both, "B3V-DA", "B3V", tuned, "iot")
+            run_family(rows, "E8", "B3V-DA − ", f"{tuned}/iot", {"B3V": d1}, yrs, "increase", seed, role="exploratory")
+            d2, yrs = lam_diff(both, "LXB-DA", "B3V-DA", tuned, "iot")
+            run_family(rows, "E8", "LXB-DA − ", f"{tuned}/iot", {"B3V-DA": d2}, yrs, "increase", seed,
+                       role="exploratory")
+    dt = read("exploratory/dt_450", optional=True)                                  # E9
+    if dt is not None:
+        for iot in ("phys", "iot"):
+            if {"LXB", "B3"} <= set(dt[(dt.tuned == "tuned") & (dt.iot == iot)].method):
+                d, yrs = lam_diff(dt, "LXB", "B3", "tuned", iot)
+                run_family(rows, "E9", "LXB − ", f"tuned/{iot} (7.5 min)", {"B3": d}, yrs, "increase", seed,
+                           role="exploratory")
+        if {"LXB", "LXB-DA"} <= set(dt[(dt.tuned == "tuned") & (dt.iot == "iot")].method):
+            d, yrs = lam_diff(dt, "LXB-DA", "LXB", "tuned", "iot")
+            run_family(rows, "E9", "LXB-DA − ", "tuned/iot (7.5 min)", {"LXB": d}, yrs, "increase", seed,
+                       role="exploratory")
     t = pd.DataFrame(rows)
     t.to_csv(RES / f"exploratory_tests{suffix}.csv", index=False)
     lines = ["| Test | Comparison | Variant | Estimate | 95% CI | Holm p | Sign share | Decision |", "|" + "---|" * 8]

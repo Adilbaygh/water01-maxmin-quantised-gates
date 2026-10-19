@@ -11,11 +11,14 @@ Sections:
   2. deadband_aware  LXB-DA (pulse rule) under the IoT chain; price relative to LXB under ideal execution;
   3. seed_1..3       independent seeds: lambda_IoT, price of LXB, LXB - B0 and LXB - B3;
   4. forecast_loo    supply forecast without the simulated season (LXB, phys and IoT);
-  5. blank_carry     blank supply entries replaced by the nearest record (LXB, B0, B3);
+  5. blank_carry     blank supply entries replaced by the last recorded value (LXB, B0, B3);
   6. bootstrap       decisions with 5- and 20-day blocks, circular blocks and a season bootstrap, compared with the
                      pre-specified 10-day moving block;
   7. volume          volume-weighted satisfaction R_vol[p] = sum_j min(V_j, D_j) / sum_j D_j;
-  8. untuned_reverse reverse gate mismatch (LXB, B0, B3, B3V).
+  8. untuned_reverse reverse gate mismatch (LXB, B0, B3, B3V);
+  9. final_share     LXB-F (execution LP on the final daily share of each user) against LXB;
+ 10. b3v_deadband    B3V-DA (B3V with the pulse rule of LXB-DA) against B3V and LXB-DA, IoT chain;
+ 11. dt_450          command step of 7.5 min instead of 15 min (LXB, B3 and LXB-DA, tuned).
 Usage: python scripts/summarize_exploratory.py  ->  results/exploratory_summary.csv and .md
 """
 import argparse
@@ -141,7 +144,7 @@ def main():
 
     # 4-5. Forecast and blank entries
     for case, methods, title in (("forecast_loo", ("LXB",), "4. Leave-one-year-out forecast"),
-                                 ("blank_carry", ("LXB", "B0", "B3"), "5. Blank supply entries filled with the nearest record")):
+                                 ("blank_carry", ("LXB", "B0", "B3"), "5. Blank supply entries filled with the last recorded value")):
         f = R / case
         md += [f"## {title}", "", "| Method | Years | λ phys | λ IoT | λ phys (base) | λ IoT (base) | Π1 ratio | Π1 ratio (base) |",
                "|" + "---|" * 8]
@@ -175,7 +178,9 @@ def main():
         for name, f, cmd in [(f"block {b}", ROOT / f"results/hypotheses_summary_block_{b}.csv",
                               f"--scenario block_{b} --data normal") for b in (5, 20)] + \
                             [(f"{s_} bootstrap", ROOT / f"results/hypotheses_summary_normal_{s_}.csv",
-                              f"--bootstrap {s_}") for s_ in ("circular", "season")]:
+                              f"--bootstrap {s_}") for s_ in ("circular", "season", "calendar")] + \
+                            [("season sign-flip test", ROOT / "results/hypotheses_summary_normal_season_seasontest.csv",
+                              "--bootstrap season --inference season")]:
             if not f.exists():
                 md.append(f"- {name}: not computed (python scripts/evaluate_hypotheses.py {cmd})")
                 continue
@@ -190,13 +195,18 @@ def main():
     md.append("")
 
     # 7. Volume-weighted satisfaction
-    dem = pd.read_csv(ROOT / "DATA/processed/demand_decadal.csv")
-    dem = dem[dem.variant == "A"].set_index(["j", "month", "decade"]).q_mean_m3s
     md += ["## 7. Volume-weighted satisfaction R_vol (base results, tuned)", "",
            "| Method | R_vol phys | R_vol IoT | loss | λ phys | λ IoT | Π1 ratio |", "|" + "---|" * 7]
-    src = {m: (B, B) for m in ("LXB", "B2", "B0", "B3", "B1", "Oracle")}
-    src["B3V"] = (R / "b3_feedback", R / "b3_feedback")
-    src["LXB-DA"] = (B, R / "deadband_aware")         # LXB-DA coincides with LXB under ideal execution
+    dfile = ROOT / "DATA/processed/demand_decadal.csv"
+    dem = pd.read_csv(dfile) if dfile.exists() else None
+    if dem is None:
+        md.append("| demand file not available | | | | | | |")
+    else:
+        dem = dem[dem.variant == "A"].set_index(["j", "month", "decade"]).q_mean_m3s
+    src = {} if dem is None else {m: (B, B) for m in ("LXB", "B2", "B0", "B3", "B1", "Oracle")}
+    if dem is not None:
+        src["B3V"] = (R / "b3_feedback", R / "b3_feedback")
+        src["LXB-DA"] = (B, R / "deadband_aware")     # LXB-DA coincides with LXB under ideal execution
     for m, (fp, fi) in src.items():
         mp = "LXB" if m == "LXB-DA" else m
         ys = complete_years([(fp, mp, "tuned", "phys"), (fi, m, "tuned", "iot")])
@@ -233,6 +243,77 @@ def main():
             add("untuned_reverse", "untuned_reverse", m, "untuned", c, "lam", lam[m], len(ys))
         md.append(f"| {c} | {len(ys)} | {lam['LXB']:.3f} | {lam['B0']:.3f} | {lam['B3']:.3f} | {lam['B3V']:.3f} | "
                   f"{lam['LXB'] - lam['B3V']:+.3f} |")
+    md.append("")
+
+    # 9. Final-share execution
+    f = R / "final_share"
+    md += ["## 9. Execution on the final daily share (LXB-F) against proportional recovery of the remaining plan (LXB)",
+           "", "| Tuned | Chain | Years | λ LXB-F | λ LXB | LXB-F − LXB | r R-1 LXB-F | r R-1 LXB |", "|" + "---|" * 8]
+    for t in ("tuned", "untuned"):
+        for c in ("phys", "iot"):
+            ys = complete_years([(f, "LXB-F", t, c), (B, "LXB", t, c)])
+            if not ys:
+                continue
+            lf, lx = frame(f, "LXB-F", t, c, ys), frame(B, "LXB", t, c, ys)
+            for k, x in (("lam", lf["lambda"].mean()), ("d_LXB", lf["lambda"].mean() - lx["lambda"].mean()),
+                         ("r_R1", lf["r_R-1"].mean())):
+                add("final_share", "final_share", "LXB-F", t, c, k, x, len(ys))
+            md.append(f"| {t} | {c} | {len(ys)} | {lf['lambda'].mean():.4f} | {lx['lambda'].mean():.4f} | "
+                      f"{lf['lambda'].mean() - lx['lambda'].mean():+.4f} | {lf['r_R-1'].mean():.3f} | {lx['r_R-1'].mean():.3f} |")
+        ys = complete_years([(f, "LXB-F", t, "phys"), (f, "LXB-F", t, "iot")])
+        if ys:
+            pr, _ = price(frame(f, "LXB-F", t, "phys", ys), frame(f, "LXB-F", t, "iot", ys))
+            add("final_share", "final_share", "LXB-F", t, "phys→iot", "price_ratio", pr, len(ys))
+            md.append(f"| {t} | Π1 LXB-F | {len(ys)} | ratio {pr:.2%} | | | | |")
+    md.append("")
+
+    # 10. B3V with the pulse rule
+    f = R / "b3v_deadband"
+    md += ["## 10. Pulse rule applied to B3V (B3V-DA, IoT chain)", "",
+           "| Tuned | Years | λ B3V-DA | λ B3V | λ LXB-DA | B3V-DA − B3V | LXB-DA − B3V-DA | r R-1 B3V-DA |",
+           "|" + "---|" * 8]
+    for t in ("tuned", "untuned"):
+        ys = complete_years([(f, "B3V-DA", t, "iot"), (R / "b3_feedback", "B3V", t, "iot"),
+                             (R / "deadband_aware", "LXB-DA", t, "iot")])
+        if not ys:
+            continue
+        bd = frame(f, "B3V-DA", t, "iot", ys)
+        bv = frame(R / "b3_feedback", "B3V", t, "iot", ys)
+        da = frame(R / "deadband_aware", "LXB-DA", t, "iot", ys)
+        l1, l2, l3 = bd["lambda"].mean(), bv["lambda"].mean(), da["lambda"].mean()
+        for k, x in (("lam_iot", l1), ("d_B3V", l1 - l2), ("d_LXB-DA", l3 - l1), ("r_R1", bd["r_R-1"].mean())):
+            add("b3v_deadband", "b3v_deadband", "B3V-DA", t, "iot", k, x, len(ys))
+        md.append(f"| {t} | {len(ys)} | {l1:.4f} | {l2:.4f} | {l3:.4f} | {l1 - l2:+.4f} | {l3 - l1:+.4f} | "
+                  f"{bd['r_R-1'].mean():.3f} |")
+    md.append("")
+
+    # 11. Command step of 7.5 min
+    f = R / "dt_450"
+    md += ["## 11. Command step of 7.5 min (dt_450, tuned)", "",
+           "| Method | Chain | Years | λ (7.5 min) | λ (15 min) | difference | r R-1 (7.5 min) | r R-1 (15 min) |",
+           "|" + "---|" * 8]
+    for m, c, fb in (("LXB", "phys", B), ("LXB", "iot", B), ("B3", "phys", B), ("B3", "iot", B),
+                     ("LXB-DA", "iot", R / "deadband_aware")):
+        ys = complete_years([(f, m, "tuned", c), (fb, m, "tuned", c)])
+        if not ys:
+            continue
+        a_, b_ = frame(f, m, "tuned", c, ys), frame(fb, m, "tuned", c, ys)
+        for k, x in (("lam", a_["lambda"].mean()), ("d_15min", a_["lambda"].mean() - b_["lambda"].mean()),
+                     ("r_R1", a_["r_R-1"].mean())):
+            add("dt_450", "dt_450", m, "tuned", c, k, x, len(ys))
+        md.append(f"| {m} | {c} | {len(ys)} | {a_['lambda'].mean():.4f} | {b_['lambda'].mean():.4f} | "
+                  f"{a_['lambda'].mean() - b_['lambda'].mean():+.4f} | {a_['r_R-1'].mean():.3f} | {b_['r_R-1'].mean():.3f} |")
+    for m in ("LXB", "B3"):
+        ys = complete_years([(f, m, "tuned", "phys"), (f, m, "tuned", "iot")])
+        if ys:
+            pr, _ = price(frame(f, m, "tuned", "phys", ys), frame(f, m, "tuned", "iot", ys))
+            add("dt_450", "dt_450", m, "tuned", "phys→iot", "price_ratio", pr, len(ys))
+            md.append(f"| {m} | Π1 | {len(ys)} | ratio {pr:.2%} | | | | |")
+    ys = complete_years([(f, "LXB", "tuned", "phys"), (f, "LXB-DA", "tuned", "iot")])
+    if ys:
+        pr, _ = price(frame(f, "LXB", "tuned", "phys", ys), frame(f, "LXB-DA", "tuned", "iot", ys))
+        add("dt_450", "dt_450", "LXB-DA", "tuned", "phys→iot", "price_ratio", pr, len(ys))
+        md.append(f"| LXB-DA | Π1 (phys: LXB) | {len(ys)} | ratio {pr:.2%} | | | | |")
     md.append("")
 
     pd.DataFrame(rows).to_csv(a.out + ".csv", index=False)

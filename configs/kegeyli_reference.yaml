@@ -26,7 +26,7 @@ canal:                       # Section 2.1, Table 1
   n_manning: {value: 0.0185, status: derived, source: "160 m3/s at H_max, actual geometry "}
   n_design: {value: 0.0193, status: derived, source: "160 m3/s at H_max, design geometry"}
   n_range: {value: [0.016, 0.025], status: assumed, source: "Chow (1959), clean earth channels"}
-  eta: {value: 0.82, status: observed, source: "2020 dispatcher sheets, median of steady days"}
+  eta: {value: 0.82, status: derived, source: "2020 dispatcher sheets, median ratio of node to head discharge on steady days"}
   eta_range: {value: [0.75, 0.92], status: assumed, source: "IQR lower bound; passport efficiency upper bound"}
   demand_eta_reference: {value: 0.82, status: setting, source: "eta used to derive DATA/processed/demand_decadal.csv; demand scales with eta (Equation (1))"}
   Q_c_m3s: {value: 86.7, status: derived, source: "Manning discharge at H_min"}

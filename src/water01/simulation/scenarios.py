@@ -5,7 +5,6 @@
 - daily_arrays: daily volume arrays for the selected days.
 """
 import calendar
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -97,8 +96,9 @@ def daily_arrays(supply, demand, limit, dates, eta):
     for p, dt in enumerate(dates):
         dec = demand[(demand.month == dt.month) & (demand.decade == decade_of(dt.day))].sort_values("j")
         D[:, p] = dec.q_mean_m3s.to_numpy() * SECONDS_PER_DAY
-    from ..domain.passport import value
-    D *= eta / value("demand_eta_reference")                   # Equation (1): D ∝ η; file derived at reference η
+    from ..domain.passport import optional, value
+    if optional("demand_scales_with_eta", True):               # Equation (1): D ∝ η; file derived at reference η
+        D *= eta / value("demand_eta_reference")
     A = eta * sup.S_m3s.to_numpy() * SECONDS_PER_DAY
     lim = limit.set_index(["month", "decade"]).S_lim_m3s
     A_lim = np.array([eta * lim.loc[(dt.month, decade_of(dt.day))] * SECONDS_PER_DAY for dt in dates])
@@ -122,7 +122,9 @@ def iot_scenario(cfg, factors=IOT_FACTORS, sensor=None):
     dev = devices()[sensor or cfg.sensor]
     kw = {}
     if "sensor" in factors:
-        kw.update(sensor_accuracy_m=dev.accuracy_m, sensor_resolution_m=dev.resolution_m)
+        from ..domain.config import optional
+        kw.update(sensor_accuracy_m=dev.accuracy_m, sensor_resolution_m=dev.resolution_m,
+                  sensor_bias_m=float(optional("sensor_bias_m", 0.0)))
     if "quantisation" in factors:
         kw.update(gate_resolution=cfg.gate_resolution_fraction, gate_deadband=cfg.gate_deadband_fraction)
     if "communication" in factors:

@@ -4,14 +4,15 @@
 
 Code, configuration, inputs and results of the article
 
-> Kudaybergenov, A. Quantifying the IoT Executability Price of Lexicographic Water Allocation: A Saint–Venant
+> Kudaybergenov, A.; Kabulov, A.; Kazimbetova, M.; Ametova, G.; Ispanova, J.; Shikhiyev, R. Quantifying the IoT Executability Price of Lexicographic Water Allocation: A Saint–Venant
 > Simulation Study of the Kegeyli Irrigation Canal, Uzbekistan. *Water* (MDPI), 2026 (submitted).
 
 The model simulates one pool of the Kegeyli canal (PK 0+00–114+40) with the Saint–Venant equations (Preissmann
 scheme) and the six outlets of the Dustlik node over the vegetation seasons 2010–2019. A daily lexicographic plan
-(max–min satisfaction of the worst user, then total satisfaction, then day-to-day variation) is executed every 15 min
-by a receding-horizon controller (LXB) and compared with current practice (B0), an open-loop fair plan (B1), a
-weighted-sum controller (B2), proportional rationing (B3) and an Oracle. Every controller runs with ideal execution
+(max–min-first: satisfaction of the worst user, then total satisfaction, then day-to-day variation) is executed every
+15 min by a receding-horizon controller (LXB), which recovers the remaining daily plan in equal proportion for all
+users, and compared with an area-based, PI-controlled surrogate for current practice (B0), an open-loop fair plan (B1),
+a weighted-sum controller (B2), proportional rationing (B3) and an Oracle. Every controller runs with ideal execution
 (*phys*) and through a simulated IoT chain (*IoT*): level-sensor error, actuator quantisation and deadband, a LoRaWAN
 packet budget with packet loss, and a solar energy balance of the node. The **IoT executability price**
 
@@ -27,8 +28,8 @@ attribute it to the four device constraints.
 | B3 proportional rationing | 0.812 | 0.276 | 66.0% |
 | LXB-DA, deadband-aware execution (exploratory) | 0.812 | 0.811 | 0.1% |
 
-All tables and numbers of the article are regenerated from the stored results by `scripts/make_results_tables.py`
-(`results/tables/`).
+The tables and numbers of the article are regenerated from the stored results by `scripts/make_results_tables.py`
+(`results/tables/`); the quantities that need the demand records (see *Data*) are skipped without them.
 
 ## Quick start: the graphical interface
 
@@ -89,8 +90,10 @@ python scripts/fig_results.py                  # Figures 4-6 -> results/figures/
 python scripts/fig_methods.py                  # Figures 1-3 -> results/figures/
 ```
 
-Without `DATA/processed/`, `make_results_tables.py` skips the two quantities that need the demand file (the
-demand-floor check and the demand of the outlet R-1).
+Without `DATA/processed/`, `make_results_tables.py` skips the quantities that need the demand file (the
+demand-floor checks, the demand of the outlet R-1 and the delivered volume relative to the demand). The hypothesis
+tests (`evaluate_hypotheses.py`) also run from the stored results; H6 needs the supply records and is reported as not
+available without them.
 
 With the operating records in `DATA/processed/`:
 
@@ -98,16 +101,17 @@ With the operating records in `DATA/processed/`:
 python scripts/run_experiment.py --verify --years 2018 --methods LXB --tuned tuned --iot iot
                                                # reruns one stored season and compares it with the stored file
 python scripts/run_experiment.py --all --jobs 4            # main runs: 240 + 140 Shapley + 10 ablation
-python scripts/run_experiment.py --sensitivity --jobs 4    # 630 sensitivity runs -> results/sensitivity/
-python scripts/run_experiment.py --exploratory --jobs 4    # 310 exploratory runs -> results/exploratory/
+python scripts/run_experiment.py --sensitivity --jobs 4    # sensitivity runs -> results/sensitivity/
+python scripts/run_experiment.py --exploratory --jobs 4    # exploratory runs -> results/exploratory/
 python scripts/check_results.py --all --write              # completeness, identical code and inputs, manifest
 python scripts/evaluate_hypotheses.py                      # H1-H7 -> results/hypotheses_summary_normal.csv
-python scripts/evaluate_hypotheses.py --bootstrap circular # bootstrap variants (also: season)
+python scripts/evaluate_hypotheses.py --bootstrap circular # bootstrap variants (also: season, calendar)
+python scripts/evaluate_hypotheses.py --bootstrap season --inference season   # seasons as the units of inference
 python scripts/evaluate_hypotheses.py --scenario block_5 --data normal
 python scripts/evaluate_hypotheses.py --scenario block_20 --data normal
 python scripts/summarize_sensitivity.py                    # -> results/sensitivity_summary.csv
 python scripts/summarize_exploratory.py                    # -> results/exploratory_summary.csv
-python scripts/compare_exploratory.py                      # -> results/exploratory_tests.csv (also --bootstrap circular)
+python scripts/compare_exploratory.py                      # -> results/exploratory_tests.csv (same options)
 python scripts/verification_convergence.py                 # grid and time-step convergence (Table S2a)
 ```
 
@@ -115,6 +119,13 @@ A season takes about 2 min for B0, B1 and B3 and about 8 min for B2, LXB and the
 files are skipped, so an interrupted sweep resumes where it stopped. Linear-program solutions can differ at the level
 of the solver tolerance between platforms and solver versions; in the environment of `requirements.txt`, the rerun of
 a stored season reproduced it exactly (`results/verification/rerun/comparison.csv`).
+
+Every result records the checksum of the code that computed it. A folder of results must come from one code version;
+results of different folders may come from different versions only if each version is listed in
+`results/versions.json`, together with the evidence that the later version reproduces the earlier results
+(`check_results.py` enforces both rules). The bootstrap schemes are: `block` (pre-specified; 10-day moving blocks
+within each season), `circular`, `season` (whole seasons) and `calendar` (moving blocks on the full calendar of each
+season; excluded days stay in place and are left out of the replicate means).
 
 The hypotheses, metrics and decision rules were fixed before the simulation runs. The protocol is
 `requirements/hypotheses.md` (original language; its SHA-256 is recorded in `results/experiment/PREREGISTRATION.json`
@@ -128,7 +139,7 @@ src/water01/
     hydraulics/    Saint-Venant equations, Preissmann solver, gate equations and the Dustlik node
     optimization/  daily lexicographic LP (stages 1, 1b, 2, 3) and the 15-min execution LP
     iot/           devices, quantisation and deadband, measurement model, packet budget, energy balance
-    control/       controllers B0, B1, B2, B3, B3V, LXB, LXB-DA, LXB-noS3, Oracle
+    control/       controllers B0, B1, B2, B3, B3V, B3V-DA, LXB, LXB-F, LXB-DA, LXB-noS3, Oracle
     simulation/    closed loop, scenarios, runner, provenance (.meta.json)
     evaluation/    metrics, price, Shapley values, statistics, decision rules
 configs/           kegeyli_reference.yaml (every parameter: value, status observed/derived/assumed/setting, source)

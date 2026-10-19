@@ -48,6 +48,8 @@
 - block 20: 0 of 50 decisions differ
 - circular bootstrap: 0 of 50 decisions differ
 - season bootstrap: 0 of 50 decisions differ
+- calendar bootstrap: not computed (python scripts/evaluate_hypotheses.py --bootstrap calendar)
+- season sign-flip test: not computed (python scripts/evaluate_hypotheses.py --bootstrap season --inference season)
 
 ## 7. Volume-weighted satisfaction R_vol (base results, tuned)
 
@@ -68,4 +70,35 @@
 |---|---|---|---|---|---|---|
 | phys | 10 | 0.701 | 0.767 | 0.701 | 0.701 | +0.000 |
 | iot | 10 | 0.661 | 0.422 | 0.000 | 0.661 | +0.000 |
+
+## 9. Execution on the final daily share (LXB-F) against proportional recovery of the remaining plan (LXB)
+
+| Tuned | Chain | Years | λ LXB-F | λ LXB | LXB-F − LXB | r R-1 LXB-F | r R-1 LXB |
+|---|---|---|---|---|---|---|---|
+| tuned | phys | 10 | 0.8117 | 0.8117 | -0.0000 | 0.812 | 0.812 |
+| tuned | iot | 10 | 0.7645 | 0.7645 | +0.0000 | 0.766 | 0.766 |
+| tuned | Π1 LXB-F | 10 | ratio 5.80% | | | | |
+| untuned | phys | 10 | 0.8102 | 0.8091 | +0.0011 | 0.821 | 0.826 |
+| untuned | iot | 10 | 0.7675 | 0.7496 | +0.0179 | 0.779 | 0.760 |
+| untuned | Π1 LXB-F | 10 | ratio 5.27% | | | | |
+
+## 10. Pulse rule applied to B3V (B3V-DA, IoT chain)
+
+| Tuned | Years | λ B3V-DA | λ B3V | λ LXB-DA | B3V-DA − B3V | LXB-DA − B3V-DA | r R-1 B3V-DA |
+|---|---|---|---|---|---|---|---|
+| tuned | 10 | 0.8079 | 0.7635 | 0.8107 | +0.0444 | +0.0028 | 0.815 |
+| untuned | 10 | 0.6939 | 0.6626 | 0.8088 | +0.0313 | +0.1150 | 0.838 |
+
+## 11. Command step of 7.5 min (dt_450, tuned)
+
+| Method | Chain | Years | λ (7.5 min) | λ (15 min) | difference | r R-1 (7.5 min) | r R-1 (15 min) |
+|---|---|---|---|---|---|---|---|
+| LXB | phys | 10 | 0.8116 | 0.8117 | -0.0000 | 0.812 | 0.812 |
+| LXB | iot | 10 | 0.8003 | 0.7645 | +0.0358 | 0.803 | 0.766 |
+| B3 | phys | 10 | 0.8117 | 0.8117 | +0.0000 | 0.812 | 0.812 |
+| B3 | iot | 10 | 0.2081 | 0.2757 | -0.0676 | 0.223 | 0.292 |
+| LXB-DA | iot | 10 | 0.8111 | 0.8107 | +0.0004 | 0.814 | 0.815 |
+| LXB | Π1 | 10 | ratio 1.40% | | | | |
+| B3 | Π1 | 10 | ratio 74.36% | | | | |
+| LXB-DA | Π1 (phys: LXB) | 10 | ratio 0.06% | | | | |
 

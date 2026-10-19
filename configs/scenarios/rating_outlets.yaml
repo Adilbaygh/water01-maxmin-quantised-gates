@@ -1,0 +1,5 @@
+meta:
+  name: rating_outlets
+  description: "Sensitivity (plant/controller mismatch): outlet-specific gate rating errors of the five regulators; the controller keeps the nominal relation"
+additions:
+  outlet_rating_factors: {value: [1.05, 0.90, 1.10, 0.95, 1.05], status: assumed, source: "actual / modelled regulator discharge; +-10% pattern, R-1 under-delivers"}

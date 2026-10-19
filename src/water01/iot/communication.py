@@ -13,7 +13,9 @@ class LinkState:
     window_start: int = 0
     sent_in_window: int = 0
     sent_total: int = 0
-    dropped: int = 0
+    dropped: int = 0             # blocked + lost
+    blocked: int = 0             # not sent: the budget of the window was exhausted
+    lost: int = 0                # sent but lost on the channel
 
 
 def transmit(state, step, delivered=True):
@@ -25,10 +27,10 @@ def transmit(state, step, delivered=True):
         state.window_start = step - (step - state.window_start) % state.window_steps
         state.sent_in_window = 0
     if state.sent_in_window >= state.budget:
-        state.dropped += 1
+        state.dropped += 1; state.blocked += 1
         return False
     state.sent_in_window += 1; state.sent_total += 1
     if not delivered:
-        state.dropped += 1
+        state.dropped += 1; state.lost += 1
         return False
     return True

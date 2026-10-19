@@ -69,7 +69,8 @@ def daily_price(d, m, tuned, early_excluded=False):
     return x, pi
 
 
-EXPL_TABLE_HEAD = ["Comparison", "Chain", "Estimate [95% CI]", "95% CI, circular blocks", "p (Holm)", "Sign", "Decision"]
+EXPL_TABLE_HEAD = ["Comparison", "Chain", "Estimate [95% CI]", "p (Holm)", "Sign", "Decision",
+                   "Seasons as units: 95% CI; p (Holm)"]
 EPS_LAMBDA = 0.01                                     # practical margin of the lambda comparisons (Section 2.9)
 DEC = {"superior": "Superior", "non-inferior": "Non-inferior", "supported": "Supported", "rejected": "Rejected",
        "inconclusive": "Inconclusive", "not testable": "Not testable", "no data": "No data"}
@@ -113,7 +114,7 @@ def exploratory(d, N):
         N[f"r_R1_{m}_{t}_{v}"] = x["r_R-1"]; N[f"hmin_mean_{m}_{t}_{v}"] = x.h_min
     # Table 8: exploratory tests
     t = pd.read_csv(tests_p)
-    circ_p = os.path.join(ROOT, "results/exploratory_tests_circular.csv")
+    circ_p = os.path.join(ROOT, "results/exploratory_tests_season_seasontest.csv")    # seasons as units
     circ = ({(c.hypothesis, c.comparison, c.variant): c for c in pd.read_csv(circ_p).itertuples()}
             if os.path.exists(circ_p) else {})
     dec = DEC
@@ -132,13 +133,21 @@ def exploratory(d, N):
               minus(f"{v:+.4f}") if abs(v) < 5e-4 else minus(f"{v:+.3f}")) if not tiny else \
             (lambda v: "0" if v == 0 else ("+" if v > 0 else "−") + sci(abs(v)))
         c = circ.get((x.hypothesis, x.comparison, x.variant))
-        ci_c = f"[{nm(c.ci_low)}, {nm(c.ci_high)}]" if c is not None else "—"
         lab = dec.get(x.decision, x.decision)
         if x.decision == "superior" and not x.comparison.startswith("Π1") and abs(x.estimate) < EPS_LAMBDA:
             lab += " (below *ε*{~λ~})"
-        t8.append([comp, chain, f"{nm(x.estimate)} [{nm(x.ci_low)}, {nm(x.ci_high)}]", ci_c, p,
-                   f"{x.sign_share * 10:.0f}/10", lab])
         if c is not None:
+            ps = "< 0.001" if c.p_holm < 0.001 else f"{c.p_holm:.3f}"
+            ci_c = f"[{nm(c.ci_low)}, {nm(c.ci_high)}]; {ps}"
+            if c.decision != x.decision:
+                ci_c += f" ({dec.get(c.decision, c.decision).lower()})"
+        else:
+            ci_c = "—"
+        t8.append([comp, chain, f"{nm(x.estimate)} [{nm(x.ci_low)}, {nm(x.ci_high)}]", p,
+                   f"{x.sign_share * 10:.0f}/10", lab, ci_c])
+        if c is not None:
+            N[f"expl_season_{x.hypothesis}_{x.variant.replace(' (reverse)', '').replace('/', '_')}_"
+              f"{x.comparison.split(' − ')[-1].strip('()')}"] = [c.ci_low, c.ci_high, c.p_holm, c.decision]
             N[f"expl_circ_{x.hypothesis}_{x.variant.replace(' (reverse)', '').replace('/', '_')}_"
               f"{x.comparison.split(' − ')[-1].strip('()')}"] = [c.ci_low, c.ci_high]
         key = (f"expl_{x.hypothesis}_{x.comparison.split(' − ')[-1].strip('()')}_"
@@ -164,14 +173,20 @@ def exploratory(d, N):
     tS7.append(["Leave-one-year-out limit forecast", "LXB; phys, IoT", f3(v("forecast_loo", "forecast_loo", "lam_iot")),
                 pct(v("forecast_loo", "forecast_loo", "price_ratio")), "—", "—"])
     bl = {m: (v("blank_carry", "blank_carry", "lam_phys", m), v("blank_carry", "blank_carry", "lam_iot", m)) for m in ("LXB", "B0", "B3")}
-    tS7.append(["Blank supply days filled with nearest record", "LXB, B0, B3; phys, IoT", f3(bl["LXB"][1]),
+    tS7.append(["Blank supply days filled with the last recorded value", "LXB, B0, B3; phys, IoT", f3(bl["LXB"][1]),
                 pct(v("blank_carry", "blank_carry", "price_ratio", "LXB")), minus(f"{bl['LXB'][1] - bl['B0'][1]:+.3f}"),
                 minus(f"{bl['LXB'][1] - bl['B3'][1]:+.3f}")])
     N["loo_price"] = v("forecast_loo", "forecast_loo", "price_ratio"); N["blank_price"] = v("blank_carry", "blank_carry", "price_ratio", "LXB")
     N["blank_dB0"] = bl["LXB"][1] - bl["B0"][1]; N["blank_dB3"] = bl["LXB"][1] - bl["B3"][1]
     N["blank_price_B0"] = v("blank_carry", "blank_carry", "price_ratio", "B0"); N["blank_price_B3"] = v("blank_carry", "blank_carry", "price_ratio", "B3")
-    for name in ("block 5", "block 20", "circular bootstrap", "season bootstrap"):
-        N[name.replace(" ", "_") + "_changed"] = int(v("bootstrap", name, "changed_decisions"))
+    for name in ("block 5", "block 20", "circular bootstrap", "season bootstrap", "calendar bootstrap",
+                 "season sign-flip test"):
+        sel = sm[(sm.item == "bootstrap") & (sm.case == name)]
+        if len(sel):
+            N[name.replace(" ", "_").replace("-", "_") + "_changed"] = int(sel.value.iloc[0])
+    for item, case in (("final_share", "final_share"), ("b3v_deadband", "b3v_deadband"), ("dt_450", "dt_450")):
+        for r_ in sm[sm.item == item].itertuples():
+            N[f"x_{case}_{r_.method}_{r_.tuned}_{r_.chain.replace('→', 'to')}_{r_.metric}"] = float(r_.value)
     rv = {(r.method, r.chain): r.value for r in sm[(sm.item == "untuned_reverse")].itertuples()}
     for (m, c), x in rv.items():
         N[f"reverse_lam_{m}_{c}"] = float(x)
@@ -262,6 +277,157 @@ def robust(N):
         N[f"phi_{name}_excl_tiny_absmax_year"] = float(t[k].abs().max())
 
 
+CODES = ["".join(c) for r in range(1, 5) for c in itertools.combinations("SQCE", r)]
+FACTORS = dict(zip("SQCE", ("sensor", "quantisation", "communication", "energy")))
+
+
+def shapley(v):
+    """Shapley values of the four factors from the values v[frozenset(code)] of the 16 coalitions."""
+    phi = {}
+    for k in "SQCE":
+        rest = [q for q in "SQCE" if q != k]
+        phi[k] = sum(math.factorial(r) * math.factorial(3 - r) / 24 * (v[frozenset(c + (k,))] - v[frozenset(c)])
+                     for r in range(4) for c in itertools.combinations(rest, r))
+    return phi
+
+
+def attribution(N, day="2014-06-06"):
+    """Shapley attribution of the ratio-of-means price of LXB (tuned) over all seasons and per season, and the
+    coalition prices of the day with the largest seasonal residual (default 6 June 2014)."""
+    rd = os.path.join(ROOT, "results/experiment/normal")
+    lam = {c: [] for c in ["phys"] + CODES}
+    for y in range(2010, 2020):
+        for c in lam:
+            f = pd.read_csv(os.path.join(rd, f"LXB_{y}_tuned_{'iot' if c == 'SQCE' else c}.csv"))
+            lam[c].append(f.set_index("date")["lambda"])
+    rows = []
+    for label, sel in [("all", slice(None))] + [(str(y), slice(i, i + 1)) for i, y in enumerate(range(2010, 2020))]:
+        ph = pd.concat(lam["phys"][sel])
+        v = {frozenset(): 0.0}
+        for c in CODES:
+            v[frozenset(c)] = float((ph.mean() - pd.concat(lam[c][sel]).mean()) / ph.mean())
+        phi = shapley(v)
+        rows.append(dict(season=label, price=v[frozenset("SQCE")], **{f"phi_{FACTORS[k]}": phi[k] for k in "SQCE"}))
+    t = pd.DataFrame(rows)
+    allr = t.iloc[0]
+    for k in FACTORS.values():
+        N[f"phi_ratio_{k}"] = float(allr[f"phi_{k}"])
+    N["phi_ratio_price"] = float(allr.price)
+    N["phi_ratio_seasonal_sum_mean"] = float(t.iloc[1:].price.mean())
+    y = int(day[:4]); i = y - 2010
+    ph = float(lam["phys"][i].loc[day])
+    coal = [dict(coalition="phys", lam=ph, price=0.0)]
+    for c in CODES:
+        li = float(lam[c][i].loc[day])
+        coal.append(dict(coalition="IoT (SQCE)" if c == "SQCE" else c, lam=li, price=(ph - li) / ph if ph > 0 else np.nan))
+    tc = pd.DataFrame(coal)
+    N["day_coalitions_date"] = day
+    N["day_coalitions_lam_phys"] = ph
+    for r in tc.itertuples():
+        N[f"day_coalition_{r.coalition.split()[0] if r.coalition != 'IoT (SQCE)' else 'SQCE'}_price"] = float(r.price)
+    t.to_csv(os.path.join(TABLES, "shapley_ratio_of_means.csv"), index=False)
+    tc.to_csv(os.path.join(TABLES, f"coalitions_{day}.csv"), index=False)
+    return t, tc
+
+
+def link_counters(N):
+    """Command packets attempted, refused by the window budget, transmitted and lost (LXB, tuned, IoT chain).
+    Needs the counters "blocked" and "lost" of the result files."""
+    rd = os.path.join(ROOT, "results/experiment/normal")
+    fr = [pd.read_csv(os.path.join(rd, f"LXB_{y}_tuned_iot.csv")).iloc[0] for y in range(2010, 2020)]
+    t = pd.DataFrame(fr)
+    if "blocked" not in t.columns or "lost" not in t.columns:
+        return
+    sent, blocked, lost = (float(t[c].sum()) for c in ("messages", "blocked", "lost"))
+    N["link_attempted_LXB"] = sent + blocked; N["link_transmitted_LXB"] = sent
+    N["link_blocked_share_LXB"] = blocked / (sent + blocked) if sent + blocked > 0 else np.nan
+    N["link_lost_share_LXB"] = lost / sent if sent > 0 else np.nan
+    N["link_failed_share_LXB"] = (blocked + lost) / (sent + blocked) if sent + blocked > 0 else np.nan
+
+
+def overdelivery(N):
+    """Delivered volume relative to the demand without the cap of r at 1 (tuned, IoT chain): LXB, B3V and LXB-DA.
+    Needs the demand file of the closed operating records."""
+    if not os.path.exists(DEMAND):
+        print("demand_decadal.csv not found: the overdelivery check is skipped")
+        return None
+    dem = pd.read_csv(DEMAND)
+    dem = dem[dem.variant == "A"].set_index(["j", "month", "decade"]).q_mean_m3s
+    src = {"LXB": "results/experiment/normal", "B3V": "results/exploratory/b3_feedback",
+           "LXB-DA": "results/exploratory/deadband_aware"}
+    rows = []
+    for m, folder in src.items():
+        fs = [os.path.join(ROOT, folder, f"{m}_{y}_tuned_iot.csv") for y in range(2010, 2020)]
+        if not all(os.path.exists(f) for f in fs):
+            continue
+        t = pd.concat([pd.read_csv(f) for f in fs], ignore_index=True)
+        dt_ = pd.to_datetime(t.date)
+        dec = np.where(dt_.dt.day <= 10, 1, np.where(dt_.dt.day <= 20, 2, 3))
+        for j, u in enumerate(USERS[:5]):
+            D = np.array([dem.loc[(j + 1, mo, de)] for mo, de in zip(dt_.dt.month, dec)]) * 86400.0
+            V = t[f"V_{u}"].to_numpy()
+            ok = D > 0
+            ratio = V[ok] / D[ok]
+            early = ((dt_.dt.month == 4) & (dec == 1)).to_numpy()[ok]
+            rows.append(dict(method=m, user=u, days=int(ok.sum()), demand_m3_day_early=float(D[ok][early].mean()),
+                             delivered_m3_day_early=float(V[ok][early].mean()),
+                             ratio_mean_early=float(ratio[early].mean()), ratio_max_early=float(ratio[early].max()),
+                             ratio_min_early=float(ratio[early].min()), ratio_mean=float(ratio.mean()),
+                             early_days_delivered=int((V[ok][early] > 0).sum()),
+                             delivered_m3_day_early_pos=float(V[ok][early][V[ok][early] > 0].mean())
+                             if (V[ok][early] > 0).any() else np.nan,
+                             delivered_m3_day_early_pos_min=float(V[ok][early][V[ok][early] > 0].min())
+                             if (V[ok][early] > 0).any() else np.nan,
+                             delivered_m3_day_early_max=float(V[ok][early].max()),
+                             days_above_1p05=int((ratio > 1.05).sum()),
+                             excess_share=float(np.maximum(V[ok] - D[ok], 0).sum() / D[ok].sum())))
+    t = pd.DataFrame(rows)
+    if t.empty:
+        return None
+    for r in t.itertuples():
+        if r.user == "R-1":
+            for k in ("demand_m3_day_early", "delivered_m3_day_early", "ratio_mean_early", "ratio_max_early",
+                      "ratio_min_early", "excess_share", "days_above_1p05", "early_days_delivered",
+                      "delivered_m3_day_early_pos", "delivered_m3_day_early_pos_min", "delivered_m3_day_early_max"):
+                N[f"over_{r.method}_R1_{k}"] = float(getattr(r, k))
+    t[t.user == "R-1"].to_csv(os.path.join(TABLES, "overdelivery_R1.csv"), index=False)   # R-1 only (Section 3)
+    return t
+
+
+def demand_floor_common(d, N):
+    """Demand-floor check with one mask for all methods and chains: the floor of each user-day is computed at the
+    normal node level H_norm, so that every method is evaluated on the same user-days."""
+    if not os.path.exists(DEMAND):
+        return
+    sys.path.insert(0, os.path.join(ROOT, "src"))
+    from water01.domain.passport import value
+    from water01.hydraulics.node import DustlikNode
+    from water01.simulation.scenarios import load_config
+    load_config()
+    node = DustlikNode()
+    res, db = value("gate_resolution_fraction"), value("gate_deadband_fraction")
+    a_min = np.ceil(db / res - 1e-9) * res * np.asarray(node.max_opening, float)
+    floor = node.offtakes(value("h_init_m"), a_min[:5]) * 86400.0 / value("steps_per_day")
+    dem = pd.read_csv(DEMAND)
+    dem = dem[dem.variant == "A"].set_index(["j", "month", "decade"]).q_mean_m3s
+    t = d[(d.tuned == "tuned") & d.method.isin(["LXB", "B0", "B3", "B2", "Oracle", "B1"])].copy()
+    dt_ = pd.to_datetime(t.date)
+    dec = np.where(dt_.dt.day <= 10, 1, np.where(dt_.dt.day <= 20, 2, 3))
+    ok = np.ones((len(t), len(USERS)), bool)
+    for j in range(5):
+        D = np.array([dem.loc[(j + 1, mo, de)] for mo, de in zip(dt_.dt.month, dec)]) * 86400.0
+        ok[:, j] = D >= floor[j]
+    r = t[[f"r_{u}" for u in USERS]].to_numpy()
+    t["lam_floor"] = np.where(ok, r, np.inf).min(axis=1)
+    lx = (t.method == "LXB") & (t.iot == "phys")
+    N["floorc_excluded_user_days"] = int((~ok[lx.to_numpy(), :5]).sum())
+    N["floorc_excluded_pairs_share"] = float(1 - ok[lx.to_numpy(), :5].mean())
+    g = t.groupby(["method", "iot"]).lam_floor.mean()
+    for m in ("LXB", "B0", "B3", "B2", "Oracle", "B1"):
+        N[f"floorc_lam_{m}_phys"] = float(g[(m, "phys")]); N[f"floorc_lam_{m}_iot"] = float(g[(m, "iot")])
+        N[f"floorc_price_{m}"] = float((g[(m, "phys")] - g[(m, "iot")]) / g[(m, "phys")])
+
+
 def changed_text(N):
     """Names the decisions that differ from the pre-specified 10-day moving block in any bootstrap variant."""
     base = pd.read_csv(os.path.join(ROOT, "results/hypotheses_summary_normal.csv"))
@@ -269,7 +435,9 @@ def changed_text(N):
     out = []
     for label, f in (("5-day blocks", "hypotheses_summary_block_5.csv"), ("20-day blocks", "hypotheses_summary_block_20.csv"),
                      ("circular blocks", "hypotheses_summary_normal_circular.csv"),
-                     ("the season bootstrap", "hypotheses_summary_normal_season.csv")):
+                     ("the season bootstrap", "hypotheses_summary_normal_season.csv"),
+                     ("the calendar bootstrap", "hypotheses_summary_normal_calendar.csv"),
+                     ("seasons as the units of inference", "hypotheses_summary_normal_season_seasontest.csv")):
         path = os.path.join(ROOT, "results", f)
         if not os.path.exists(path):
             continue
@@ -281,25 +449,35 @@ def changed_text(N):
 
 
 def write_s8(tS7, tR, N):
-    """Supplementary S8 (Tables S7a and S7b), appended after S7 by build_appendix_supp.py."""
+    """Supplementary S8 (Tables S7a-S7e), appended after S7 by build_appendix_supp.py."""
     md = lambda c: c.replace("{^", "^").replace("^}", "^").replace("{~", "~").replace("~}", "~")
     tab = lambda t: ["| " + " | ".join(md(c) for c in t[0]) + " |", "|" + "---|" * len(t[0])] + \
         ["| " + " | ".join(md(c) for c in r) + " |" for r in t[1:]]
     pr = [N[f"seed{k}_price"] for k in (1, 2, 3)] + [N["price_ratio_LXB_tuned"]]
-    ch = [N[k] for k in ("block_5_changed", "block_20_changed", "circular_bootstrap_changed", "season_bootstrap_changed")]
-    lines = ["## S8. Exploratory Controllers and Robustness Runs", "",
+    keys = ("block_5_changed", "block_20_changed", "circular_bootstrap_changed", "season_bootstrap_changed",
+            "calendar_bootstrap_changed")
+    ch = [N.get(k, 0) for k in keys]
+    st = N.get("seasontest_changed", 0)
+    st_txt = "; ".join(x.replace("->", "→").replace("/iot", "/IoT").replace("_", " ").replace("gap LXB", "gap~LXB~").replace("gap B2", "gap~B2~")
+                       for x in N.get("seasontest_changed_list", []))
+    lines = ["## S8. Exploratory Controllers, Added Cases, and Robustness Runs", "",
              "The runs of this section were not pre-specified and are reported as exploratory (Section 2.10). The "
-             "comparisons with B3V and LXB-DA and those under the reverse gate mismatch are given in Table 8 and Section 3.4. Table S7a repeats the IoT chain with "
+             "comparisons with B3V, LXB-DA, LXB-F, and B3V-DA, those with the 7.5 min step, and those under the reverse "
+             "gate mismatch are given in Table 8 and Section 3.4. Table S7a repeats the IoT chain with "
              "three further random seeds (sensor noise and packet loss), replaces the limit forecast by a "
-             "leave-one-year-out mean, and fills the blank supply entries with the nearest record of the same season; "
+             "leave-one-year-out mean, and fills the blank supply entries with the last recorded value of the same season; "
              "all use tuned gate coefficients. Across the four seeds, the price of LXB ranged from "
              f"{min(pr) * 100:.1f}% to {max(pr) * 100:.1f}%. The decisions in Table S6 were recomputed with bootstrap "
-             f"blocks of 5 and 20 days, with circular blocks, and with a bootstrap over whole seasons; "
+             "blocks of 5 and 20 days, with circular blocks, with a bootstrap over whole seasons, and with moving blocks "
+             "on the full season calendar; "
              + (f"none of the {N['tests_n']} decisions changed under any of these settings" if not any(ch) else
-                f"{ch[0]}, {ch[1]}, {ch[2]}, and {ch[3]} of the {N['tests_n']} decisions changed, respectively"
-                f"{changed_text(N)}") + ". Table S7b "
-             "gives the "
-             "volume-weighted satisfaction *R*~vol~ of Section 2.7.", "",
+                ", ".join(str(c) for c in ch) + f" of the {N['tests_n']} decisions changed, respectively"
+                f"{changed_text(N)}")
+             + (f". With the ten seasons as the units of inference, {st} decisions changed ({st_txt})" if st else
+                ". With the ten seasons as the units of inference, no decision changed")
+             + ". Table S7b gives the volume-weighted satisfaction *R*~vol~ of Section 2.7, Table S7c the sensitivity "
+             "cases added after the main runs, Table S7d the execution variants, and Table S7e the attribution of the "
+             "price as a ratio of means and the coalition prices of the day that dominates the 2014 attribution.", "",
              "<!-- widths: 30,20,12,12,13,13 -->", "",
              "**Table S7a.** Robustness of the IoT price and of the advantage of LXB (tuned gate coefficients, ten seasons). "
              "Π~1~ as a ratio of means; for the blank-supply case, the phys reference is the phys run of the same case.", ""]
@@ -309,6 +487,76 @@ def write_s8(tS7, tR, N):
               "*λ* (tuned gate coefficients, 1830 days). Loss: relative change of *R*~vol~ from phys to IoT. For "
               "LXB-DA, the phys reference is LXB, with which it coincides under ideal execution.", ""]
     lines += tab(tR)
+    # S7c: added sensitivity cases
+    cases = [("eta_fixed_demand_low", "*η* = 0.75, demand at the node fixed"),
+             ("eta_true_low", "Plant *η* = 0.75, controller 0.82"),
+             ("rating_outlets", "Regulator ratings 1.05/0.90/1.10/0.95/1.05"),
+             ("tailwater_high", "Tail water of the regulators +0.3 m"),
+             ("sensor_bias_pos", "Sensor offset +0.025 m"), ("sensor_bias_neg", "Sensor offset −0.025 m")]
+    t = [["Case", "*λ* LXB phys", "*λ* LXB IoT", "Π~1~ LXB, %", "*λ* B0 IoT", "*λ* B3 IoT"]]
+    t.append(["Baseline", f3(N["lam_LXB_tuned_phys"]), f3(N["lam_LXB_tuned_iot"]), pct(N["price_ratio_LXB_tuned"]),
+              f3(N["lam_B0_tuned_iot"]), f3(N["lam_B3_tuned_iot"])])
+    for c, lab in cases:
+        if f"sens_{c}_lam_iot" not in N:
+            continue
+        t.append([lab, f3(N[f"sens_{c}_lam_phys"]), f3(N[f"sens_{c}_lam_iot"]), pct(N[f"sens_{c}_pi1_ratio"]),
+                  f3(N[f"sens_{c}_B0_lam_iot"]), f3(N[f"sens_{c}_B3_lam_iot"])])
+    lines += ["", "<!-- widths: 34,13,13,13,13,14 -->", "",
+              "**Table S7c.** Sensitivity cases added after the main runs (tuned gate coefficients, ten seasons; "
+              "descriptive). For the sensor offsets, the phys reference is the baseline run.", ""]
+    lines += ["| " + " | ".join(md(c) for c in t[0]) + " |", "|" + "---|" * len(t[0])] + \
+        ["| " + " | ".join(md(c) for c in r) + " |" for r in t[1:]]
+    # S7d: execution variants
+    x = lambda k: N.get(k, float("nan"))
+    t = [["Controller and step", "Coefficients", "*λ* phys", "*λ* IoT", "Π~1~, %", "*r* R-1 IoT"]]
+    for lab, tn, ph, io, prk, rr in (
+            ("LXB, 15 min", "tuned", N["lam_LXB_tuned_phys"], N["lam_LXB_tuned_iot"], N["price_ratio_LXB_tuned"],
+             N["r_LXB_iot_R-1"]),
+            ("LXB-F, 15 min", "tuned", x("x_final_share_LXB-F_tuned_phys_lam"), x("x_final_share_LXB-F_tuned_iot_lam"),
+             x("x_final_share_LXB-F_tuned_phystoiot_price_ratio"), x("x_final_share_LXB-F_tuned_iot_r_R1")),
+            ("LXB, 15 min", "untuned", N["lam_LXB_untuned_phys"], N["lam_LXB_untuned_iot"],
+             (N["lam_LXB_untuned_phys"] - N["lam_LXB_untuned_iot"]) / N["lam_LXB_untuned_phys"],
+             N["r_R1_LXB_untuned_iot"]),
+            ("LXB-F, 15 min", "untuned", x("x_final_share_LXB-F_untuned_phys_lam"),
+             x("x_final_share_LXB-F_untuned_iot_lam"), x("x_final_share_LXB-F_untuned_phystoiot_price_ratio"),
+             x("x_final_share_LXB-F_untuned_iot_r_R1")),
+            ("B3V-DA, 15 min", "tuned", float("nan"), x("x_b3v_deadband_B3V-DA_tuned_iot_lam_iot"), float("nan"),
+             x("x_b3v_deadband_B3V-DA_tuned_iot_r_R1")),
+            ("B3V-DA, 15 min", "untuned", float("nan"), x("x_b3v_deadband_B3V-DA_untuned_iot_lam_iot"), float("nan"),
+             x("x_b3v_deadband_B3V-DA_untuned_iot_r_R1")),
+            ("LXB, 7.5 min", "tuned", x("x_dt_450_LXB_tuned_phys_lam"), x("x_dt_450_LXB_tuned_iot_lam"),
+             x("x_dt_450_LXB_tuned_phystoiot_price_ratio"), x("x_dt_450_LXB_tuned_iot_r_R1")),
+            ("B3, 7.5 min", "tuned", x("x_dt_450_B3_tuned_phys_lam"), x("x_dt_450_B3_tuned_iot_lam"),
+             x("x_dt_450_B3_tuned_phystoiot_price_ratio"), x("x_dt_450_B3_tuned_iot_r_R1")),
+            ("LXB-DA, 7.5 min {^a^}", "tuned", float("nan"), x("x_dt_450_LXB-DA_tuned_iot_lam"),
+             x("x_dt_450_LXB-DA_tuned_phystoiot_price_ratio"), x("x_dt_450_LXB-DA_tuned_iot_r_R1"))):
+        fm = lambda v: "—" if v != v else f3(v)
+        t.append([lab, tn, fm(ph), fm(io), "—" if prk != prk else pct(prk, 2 if abs(prk) < 0.01 else 1), fm(rr)])
+    lines += ["", "<!-- widths: 26,15,14,14,14,17 -->", "",
+              "**Table S7d.** Execution variants (ten seasons). LXB-F: final-share execution program; B3V-DA: B3V with "
+              "the pulse rule; 7.5 min: control, command, and plant step of 7.5 min. ^a^ Price against the phys run of "
+              "LXB with the same step.", ""]
+    lines += ["| " + " | ".join(md(c) for c in t[0]) + " |", "|" + "---|" * len(t[0])] + \
+        ["| " + " | ".join(md(c) for c in r) + " |" for r in t[1:]]
+    # S7e: attribution
+    sh = pd.read_csv(os.path.join(TABLES, "shapley_ratio_of_means.csv"))
+    t = [["Season", "Π~1~ (ratio of means), %", "*φ*~S~, pp", "*φ*~Q~, pp", "*φ*~C~, pp", "*φ*~E~, pp"]]
+    for r in sh.itertuples():
+        t.append(["2010–2019" if r.season == "all" else str(r.season), f"{100 * r.price:.2f}",
+                  minus(f"{100 * r.phi_sensor:+.3f}"), minus(f"{100 * r.phi_quantisation:+.2f}"),
+                  minus(f"{100 * r.phi_communication:+.3f}"), f"{100 * r.phi_energy:.0f}"])
+    lines += ["", "<!-- widths: 16,20,16,16,16,16 -->", "",
+              "**Table S7e.** Shapley attribution of the price of LXB as a ratio of means (tuned gate coefficients; "
+              "descriptive). The pre-specified attribution of the mean daily price (H7b) is given in Table S6.", ""]
+    lines += ["| " + " | ".join(md(c) for c in t[0]) + " |", "|" + "---|" * len(t[0])] + \
+        ["| " + " | ".join(md(c) for c in r) + " |" for r in t[1:]]
+    co = pd.read_csv(os.path.join(TABLES, "coalitions_2014-06-06.csv"))
+    cells = "; ".join(f"{r.coalition.replace('IoT (SQCE)', 'SQCE')} {minus(f'{100 * r.price:.2f}')}%"
+                      for r in co.itertuples() if r.coalition != "phys")
+    lines += ["", f"On 6 June 2014, the phys run released only a residual (*λ*^phys^ = "
+              f"{md(sci(N['day_coalitions_lam_phys']))}). "
+              + f"The daily prices of the 15 constraint sets were: {cells}. Each value is the relative change of a "
+              "satisfaction close to zero, so this single day decides the sign and size of the mean-daily *φ*~S~ of 2014."]
     open(os.path.join(TABLES, "supplementary_s8.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
 
 
@@ -439,8 +687,19 @@ def main():
 
     def sign(r):
         return f"{r.sign_share * 10:.0f}/10" if pd.notna(r.sign_share) else "—"
+
+    def season_cell(x, r):
+        """p-value of the exact sign-flip test on the seasonal means; the decision if it differs."""
+        if x is None or pd.isna(x.p_holm):
+            return "—"
+        c = "< 0.001" if x.p_holm < 0.001 else f"{x.p_holm:.3f}"
+        return c + (f" ({DEC.get(x.decision, x.decision).lower()})" if x.decision != r.decision else "")
     dec = DEC
-    tS6 = [["Hyp.", "Comparison", "Chain", "Role", "Estimate [95% CI]", "p (Holm)", "Sign", "Decision"]]
+    tS6 = [["Hyp.", "Comparison", "Chain", "Role", "Estimate [95% CI]", "p (Holm)", "Sign", "Decision",
+            "Seasons as units: p (Holm)"]]
+    st_p = os.path.join(ROOT, "results/hypotheses_summary_normal_season_seasontest.csv")
+    HS = ({(x.hypothesis, x.comparison, x.variant): x for x in pd.read_csv(st_p).itertuples()}
+          if os.path.exists(st_p) else {})
     for _, r in h.iterrows():
         comp = r.comparison.replace("Π1_LXB", "Π{~1,LXB~}").replace("Π1_B1", "Π{~1,B1~}").replace("Π1", "Π{~1~}").replace("φ_Q", "*φ*{~Q~}") \
             .replace("φ_C", "*φ*{~C~}").replace("φ_S", "*φ*{~S~}").replace("Δλ_LXB", "Δ*λ*{~LXB~}") \
@@ -457,7 +716,7 @@ def main():
         hyp = r.hypothesis if r.hypothesis != "H7" else ("H7b" if r.comparison.startswith("φ") else "H7a")
         tS6.append([hyp, comp, r.variant.replace(": ", " ").replace("phys → iot", "phys → IoT")
                     .replace("/iot", "/IoT").replace("→ iot", "→ IoT"), r.role, est(r), p, sign(r),
-                    decision(r)])
+                    decision(r), season_cell(HS.get((r.hypothesis, r.comparison, r.variant)), r)])
     H = {(r.hypothesis, r.comparison, r.variant): r for _, r in h.iterrows()}
     h1 = h[h.hypothesis == "H1"]
     N["H1_superior"] = int((h1.decision == "superior").sum()); N["H1_noninferior"] = int((h1.decision == "non-inferior").sum())
@@ -477,6 +736,22 @@ def main():
     hs = pd.read_csv(os.path.join(ROOT, "results/hypotheses_summary_normal_season.csv"))
     s4 = hs[(hs.hypothesis == "H4") & (hs.variant == "tuned: phys → iot")].iloc[0]
     N["H4_season_lo"] = float(s4.ci_low); N["H4_season_hi"] = float(s4.ci_high)
+    cal_p = os.path.join(ROOT, "results/hypotheses_summary_normal_calendar.csv")
+    if os.path.exists(cal_p):
+        hk = pd.read_csv(cal_p)
+        k4 = hk[(hk.hypothesis == "H4") & (hk.variant == "tuned: phys → iot")].iloc[0]
+        N["H4_cal_lo"] = float(k4.ci_low); N["H4_cal_hi"] = float(k4.ci_high)
+    st = pd.read_csv(st_p) if os.path.exists(st_p) else None
+    if st is not None:
+        m_ = st.merge(h, on=["hypothesis", "comparison", "variant", "role"], suffixes=("", "_0"))
+        chg = m_[m_.decision != m_.decision_0]
+        N["seasontest_changed"] = int(len(chg))
+        N["seasontest_changed_list"] = [f"{x.hypothesis} {x.comparison} {x.variant}: {x.decision_0} -> {x.decision}"
+                                        for x in chg.itertuples()]
+        for x in m_[m_.hypothesis == "H1"].itertuples():
+            N[f"st_H1_{x.comparison.split(' − ')[-1]}_{x.variant.replace('/', '_')}_p"] = float(x.p_holm)
+        h1s = m_[m_.hypothesis == "H1"]
+        N["H1_superior_seasons"] = int((h1s.decision == "superior").sum())
     rH7a = g1("H7", "Π1_LXB − Π1_B1 (IoT-open)", "tuned: phys → iot")
     rH7b = g1("H7", "φ_Q + φ_C − φ_S", "tuned")
     def h1_chain(v):                       # protocol: non-inferior or superior against all four, superior against one
@@ -501,13 +776,15 @@ def main():
     t7 = [["Hypothesis", "Test (paired by day unless stated)", "Estimate [95% CI]; sign stability", "Decision"],
           ["H1", "LXB − B0, B1, B2, B3; daily *λ*; four chains (16 comparisons)",
            minus(f"{N['H1_min']:+.3f} to {N['H1_max']:+.3f}") + f"; superior in {N['H1_superior']}"
-           + (f", non-inferior in {N['H1_noninferior']} ({ni_txt})" if N["H1_noninferior"] else ""), h1_text],
+           + (f", non-inferior in {N['H1_noninferior']} ({ni_txt})" if N["H1_noninferior"] else "")
+           + (f"; seasons as units: superior in {N['H1_superior_seasons']}" if "H1_superior_seasons" in N else ""),
+           h1_text],
           ["H2", "Δ*λ*{~LXB~} − Δ*λ*{~B1~}, tuned phys → untuned IoT", f"{est(rH2)}; {sign(rH2)}",
            minus(f"{DEC[rH2.decision]} (secondary: IoT only {rH2c.estimate:+.3f}, {rH2c.decision}; model error only "
                  f"{rH2b.estimate:+.3f}, {rH2b.decision})")],
           ["H3", "*Z*{~3~}: LXB − LXB-noS3, tuned phys", f"{est(rH3)}; *λ* and *Z*{{~2~}}/6 "
            + ("non-inferior within *ε*{~λ~}" if h3_tol_ok else "outside the tolerance"), DEC[rH3.decision]],
-          ["H4", "Mean daily Π{~1~} of LXB, tuned (secondary: untuned)", minus(f"{est(rH4)}, circular blocks [{c4.ci_low:+.3f}, {c4.ci_high:+.3f}]; untuned {rH4u.estimate:+.3f}; "
+          ["H4", "Mean daily Π{~1~} of LXB, tuned (secondary: untuned)", minus(f"{est(rH4)}, season bootstrap [{s4.ci_low:+.3f}, {s4.ci_high:+.3f}]; untuned {rH4u.estimate:+.3f}; "
                  f"{sign(rH4)}"),
            DEC[rH4.decision]],
           ["H5", "gap{~LXB~} − gap{~b~}", "Identical to −(H1 difference)", "Descriptive"],
@@ -527,14 +804,20 @@ def main():
     N["sens_lam_iot_max"] = float(lxs.lam_iot.max())
     for _, r in lxs.iterrows():
         for k in ("lam_iot", "lam_phys", "pi1_ratio", "pi1_median", "d_B0_iot", "d_B3_iot", "radio_off_share",
-                  "battery_min_wh", "dropped_share"):
-            N[f"sens_{r.case}_{k}"] = float(r[k])
+                  "battery_min_wh", "blocked_share", "lost_share", "failed_share"):
+            if k in r.index and pd.notna(r[k]):
+                N[f"sens_{r.case}_{k}"] = float(r[k])
     for _, r in sens[~sens.case.str.startswith("normal")].iterrows():
         N[f"sens_{r.case}_{r.method}_lam_iot"] = float(r.lam_iot)
         N[f"sens_{r.case}_{r.method}_lam_phys"] = float(r.lam_phys)
     N["sens_d_B0_min"] = float(lxs.d_B0_iot.min()); N["sens_d_B0_max"] = float(lxs.d_B0_iot.max())
     N["sens_d_B3_min"] = float(lxs.d_B3_iot.min()); N["sens_d_B3_max"] = float(lxs.d_B3_iot.max())
     demand_floor(d, N)
+    demand_floor_common(d, N)
+    os.makedirs(TABLES, exist_ok=True)
+    attribution(N)
+    link_counters(N)
+    overdelivery(N)
     rev = exploratory(d, N)
     t8 = tS7 = tR = None
     if rev:
@@ -565,13 +848,16 @@ def main():
              + ("H6 is not testable, because no step without sufficient head occurred at the small regulators. "
                 if h6_none else "")
              + 
-             "Because daily differences are serially dependent, the Wilcoxon *p*-values are indicative only; values below "
-             "0.001 are shown as < 0.001, and the decisions rest on the bootstrap intervals and the sign stability.", "",
+             "Because daily differences are serially dependent, the daily Wilcoxon *p*-values are indicative only; values below "
+             "0.001 are shown as < 0.001. The last column repeats each test with the ten seasons as the units of inference: the "
+             "exact two-sided sign-flip test of the ten seasonal mean differences (1024 sign patterns, Holm-corrected within "
+             "the same families; smallest attainable two-sided value 0.002), with the decision recomputed from the season "
+             "bootstrap interval, this *p*-value, and the sign condition; a decision is shown only where it differs.", "",
              "In the tolerance checks of H3, the pre-specified protocol evaluates *Z*~2~ as the mean satisfaction of the six users "
              "(*Z*~2~/6) and applies the margin *ε*~λ~ = 0.01 to both *λ* and *Z*~2~. An exploratory check with *Z*~2~ as "
              "the sum of satisfactions and the solver tolerances *ε*~1~ = 10^−6^ for *λ* and *ε*~2~ = 10^−4^ for *Z*~2~ "
              f"gave: {h3s}.", "",
-             "<!-- widths: 6,18,14,11,23,12,7,13 -->", "",
+             "<!-- widths: 5,16,12,9,21,9,6,11,11 -->", "",
              "**Table S6.** All hypothesis tests of the main runs.", "",
              "| " + " | ".join(tS6[0]) + " |", "|" + "---|" * len(tS6[0])]
     lines += ["| " + " | ".join(md(c) for c in r) + " |" for r in tS6[1:]]

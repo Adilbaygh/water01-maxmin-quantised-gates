@@ -61,3 +61,20 @@ class B3VController(B3Controller):
         q = remaining / left_s
         q[-1] = max(m.eta * supply.inflow_now - q[:-1].sum(), 0.0)      # check structure: remaining water
         return Command(flows=np.minimum(q, m.capacity), target=self.target.copy())
+
+
+class B3VDeadbandAwareController(B3VController):
+    """Exploratory variant (B3V-DA): B3V with the pulse rule of LXB-DA (control.lxb.pulse_adjust), to separate the
+    effect of the deadband-aware execution rule from that of the lexicographic planner."""
+    name = "B3V-DA"
+
+    def step(self, state, demand, supply, constraints, horizon):
+        from .lxb import pulse_adjust
+        cmd = super().step(state, demand, supply, constraints, horizon)
+        m = constraints
+        if m.pulse_flow is None:
+            return cmd
+        remaining = np.maximum(self.target - np.asarray(state.delivered_today, float), 0.0)
+        q, pulses = pulse_adjust(cmd.flows, m.pulse_flow(state.level), remaining, m.dt, self.target)
+        q[-1] = max(m.eta * supply.inflow_now - q[:-1].sum(), 0.0)      # check structure: remaining water
+        return Command(flows=np.minimum(q, m.capacity), target=cmd.target, info={"pulses": pulses})

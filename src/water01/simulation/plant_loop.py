@@ -66,6 +66,7 @@ def step_response(reach, Q0, h_down, dQ, duration_s, dt_s, eta=1.0, theta=None):
 class IoTConfig:
     """IoT constraints (Section 2.6). With all of them disabled, execution is "ideal" (phys)."""
     sensor_accuracy_m: float = 0.0          # 0: error-free measurement; > 0: U(−a, a) (from the datasheet)
+    sensor_bias_m: float = 0.0              # persistent offset of the level sensor (sensitivity case)
     sensor_resolution_m: float = None       # sensor step (from the datasheet); None: no rounding
     gate_resolution: float = None           # as a fraction of the stroke; None: no quantisation
     gate_deadband: float = 0.0
@@ -77,7 +78,7 @@ class IoTConfig:
 
     @property
     def ideal(self):
-        return (self.sensor_accuracy_m == 0 and self.gate_resolution is None and self.message_budget is None
+        return (self.sensor_accuracy_m == 0 and self.sensor_bias_m == 0 and self.gate_resolution is None and self.message_budget is None
                 and self.loss_probability == 0 and not self.energy)
 
 
@@ -98,6 +99,8 @@ class ClosedLoopResult:
     battery_min_wh: float = None            # (16) minimum charge; None without the energy factor
     radio_off_steps: int = 0                # steps with the radio off because the charge was below the reserve
     energy_used_wh: float = 0.0             # IoT node consumption (RTU + gateway + messages)
+    messages_blocked: int = 0               # command packets not sent because the window budget was exhausted
+    messages_lost: int = 0                  # command packets sent but lost on the channel
 
 
 def command_to_openings(cmd, node_model, h_est, current):
@@ -121,8 +124,9 @@ class CanalPlant:
     observe(): what the sensors see (with ν); truth(): for Oracle and the recorder only; advance(): one Δt step."""
 
     def __init__(self, reach, node, supply_m3s, eta, h_init, dt, steps_per_day, theta, rng, sensor_accuracy_m=0.0,
-                 sensor_resolution_m=None):
+                 sensor_resolution_m=None, sensor_bias_m=0.0):
         self.reach, self.node, self.theta, self.dt, self.spd = reach, node, theta, dt, steps_per_day
+        self.sensor_bias_m = sensor_bias_m
         self.S = np.asarray(supply_m3s, float); self.P = self.S.size
         self.rng, self.sensor_accuracy_m, self.sensor_resolution_m = rng, sensor_accuracy_m, sensor_resolution_m
         day_s = steps_per_day * dt
@@ -178,8 +182,9 @@ class CanalPlant:
         (assumed to be observed exactly)."""
         h = float(self.solver.h[-1])
         u = self.rng.uniform(-1.0, 1.0)        # drawn at every step, whether or not the sensor error is active
-        z = (measure(h, self.sensor_accuracy_m, resolution_m=self.sensor_resolution_m, unit_noise=u)
-             if self.sensor_accuracy_m > 0 else h)
+        z = (measure(h, self.sensor_accuracy_m, resolution_m=self.sensor_resolution_m, unit_noise=u,
+                     bias_m=self.sensor_bias_m)
+             if self.sensor_accuracy_m > 0 or self.sensor_bias_m != 0 else h)
         return Observation(t=self.solver.t, day=self.day, step=self.step_in_day, level=z,
                            inflow=float(self.S[min(self.day, self.P - 1)]), openings=self.openings.copy())
 
@@ -244,7 +249,7 @@ class StateEstimator:
     def update(self, obs_after, inflow_used):
         """Updates the estimate with the post-step measurement and reconstructs the delivery."""
         m = self.m
-        if self.iot.sensor_accuracy_m > 0 or obs_after.level is None:     # None: no radio, prediction only
+        if self.iot.sensor_accuracy_m > 0 or self.iot.sensor_bias_m != 0 or obs_after.level is None:  # None: no radio
             q_rec = self.node.flows(self.h, obs_after.openings)
             pred = id_step(self.h, self.hist[0] if m.d > 0 else inflow_used, q_rec[:5], q_rec[5], m.A_s, m.dt, m.eta)
             self.h = update(obs_after.level, self.h, 0.0, 10.0, pred, self.iot.estimator_blend)  # None -> config
@@ -385,7 +390,7 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
     interlock_level = value("rtu_low_level_interlock_m")
     relief_open, relief_release = value("relief_open_level_m"), value("relief_release_level_m")
     plant = CanalPlant(plant_reach, node_true, S, eta_true, h_init, dt, spd, theta, sensor_rng, iot.sensor_accuracy_m,
-                       iot.sensor_resolution_m)
+                       iot.sensor_resolution_m, iot.sensor_bias_m)
     estimator = StateEstimator(node_model, m, theta, P, plant.h0[-1], S[0], iot)
     recorder = Recorder(P)
     energy = None
@@ -455,4 +460,6 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
                             actuator.interlock_steps, actuator.relief_steps,
                             None if energy is None else float(energy.min_wh),
                             0 if energy is None else energy.radio_off_steps,
-                            0.0 if energy is None else float(energy.used_wh))
+                            0.0 if energy is None else float(energy.used_wh),
+                            actuator.link.blocked if actuator.limited else 0,
+                            actuator.link.lost if actuator.limited else 0)

@@ -4,7 +4,7 @@ Figure 4: daily worst-user satisfaction λ, phys → IoT, six methods (tuned, un
 Figure 5: IoT price of LXB: daily λ_phys and λ_IoT; Shapley contributions by year; satisfaction by user
           (IoT).
 Figure 6: descriptive sensitivity (14 cases): LXB λ_IoT, Π1, LXB − B0 and LXB − B3.
-Data: results/experiment/normal/*.csv, results/shapley_by_year_normal.csv, results/sensitivity_summary.csv.
+Data: results/experiment/normal/*.csv, results/tables/shapley_ratio_of_means.csv, results/sensitivity_summary.csv.
 Usage: python scripts/fig_results.py [ROOT]  ->  results/figures/Figure4..6.{png,pdf}
 """
 import glob
@@ -107,7 +107,10 @@ def fig5(d):
     grid(ax, "both"); panel(ax, "(a)", x=-0.18)
     # (b) Shapley contributions by year
     ax = fig.add_subplot(gs[1])
-    s = pd.read_csv(os.path.join(ROOT, "results/shapley_by_year_normal.csv"))
+    # attribution of the ratio-of-means price of each season (make_results_tables.py); the mean-daily attribution
+    # of H7b is dominated by single days with a near-zero lambda_phys (Section 3.3)
+    s = pd.read_csv(os.path.join(ROOT, "results/tables/shapley_ratio_of_means.csv"))
+    s = s[s.season != "all"].assign(year=lambda t: t.season.astype(int))
     yrs = s.year.to_numpy(); xi = np.arange(len(yrs)); w = 0.26
     for k, (col, c, lab) in enumerate([("phi_quantisation", BLUE, r"$\phi_Q$ quantisation, deadband"),
                                        ("phi_sensor", ORANGE, r"$\phi_S$ sensor"),
@@ -115,10 +118,10 @@ def fig5(d):
         ax.bar(xi + (k - 1) * w, s[col] * 100, width=w - 0.04, color=c, label=lab, linewidth=0)
     ax.axhline(0, color=INK, lw=0.6)
     ax.set_xticks(xi); ax.set_xticklabels([str(y)[2:] for y in yrs]); ax.set_xlabel("Season (20xx)")
-    ax.set_ylabel(r"Shapley value, percentage points of $\Pi_1$")
-    ax.set_ylim(-14, 30)
+    ax.set_ylabel(r"Shapley value, pp of $\Pi_1$ (ratio of means)")
+    ax.set_ylim(-1.5, 15)
     ax.legend(loc="upper left", fontsize=6.3, handlelength=1.0, borderaxespad=0.2)
-    ax.text(0.98, 0.50, "$\\phi_E$ = 0\nin every season", transform=ax.transAxes, ha="right", va="bottom",
+    ax.text(0.98, 0.70, "$\\phi_E$ = 0\nin every season", transform=ax.transAxes, ha="right", va="bottom",
             fontsize=6.3, color=MUTED)
     grid(ax, "y"); panel(ax, "(b)", x=-0.14)
     # (c) satisfaction by user, IoT tuned
@@ -145,15 +148,19 @@ CASES = [("Baseline", "normal (deadband_low seasons)"), ("Intraday supply ramp (
          ("Deadband 0.25%", "deadband_low"), ("Deadband 1%", "deadband_high"),
          ("Solar kit 30 W / 481 Wh", "energy_moderate"), ("Solar kit 20 W", "energy_severe"),
          ("Packet loss 10%", "communication_loss"),
-         ("Budget 2 packets/h", "communication_budget_2"), ("Budget 1 packet/h", "communication_budget_1")]
+         ("Budget 2 packets/h", "communication_budget_2"), ("Budget 1 packet/h", "communication_budget_1"),
+         (r"$\eta$ = 0.75, demand fixed", "eta_fixed_demand_low"),
+         (r"Plant $\eta$ 0.75, controller 0.82", "eta_true_low"),
+         ("Outlet ratings 0.90–1.10", "rating_outlets"), ("Tail water +0.3 m", "tailwater_high"),
+         ("Sensor offset +25 mm", "sensor_bias_pos"), ("Sensor offset −25 mm", "sensor_bias_neg")]
 
 
 def fig6():
     t = pd.read_csv(os.path.join(ROOT, "results/sensitivity_summary.csv"))
     lx = t[t.method == "LXB"].set_index("case")
-    rows = [(lab, lx.loc[c]) for lab, c in CASES]
+    rows = [(lab, lx.loc[c]) for lab, c in CASES if c in lx.index]
     assert all(r.years == 10 for _, r in rows)
-    fig, axes = plt.subplots(1, 3, figsize=(W, 2.9), sharey=True, gridspec_kw={"wspace": 0.1,
+    fig, axes = plt.subplots(1, 3, figsize=(W, 0.6 + 0.153 * len(rows)), sharey=True, gridspec_kw={"wspace": 0.1,
                                                                                "width_ratios": [1, 1, 1.25]})
     ys = np.arange(len(rows))[::-1]
     base = rows[0][1]
@@ -178,7 +185,8 @@ def fig6():
     axes[0].set_ylim(-0.7, len(rows) - 0.3)
     for ax in axes:
         ax.axhspan(len(rows) - 1.5, len(rows) - 0.5, color="#F2F3F5", zorder=0, lw=0)
-    fig.subplots_adjust(left=0.2, right=0.99, top=0.9, bottom=0.15)
+    fig.subplots_adjust(left=0.2, right=0.99, top=1 - 0.26 / (0.6 + 0.153 * len(rows)),
+                        bottom=0.44 / (0.6 + 0.153 * len(rows)))
     save(fig, "Figure6")
 
 

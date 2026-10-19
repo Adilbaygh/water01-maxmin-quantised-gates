@@ -45,7 +45,7 @@ def test_complete_folder_passes_and_config_edits_are_not_errors(tmp_path):
         write_run(tmp_path, r, INPUTS)
     seen = {}
     errors, hashes = C.validate(tmp_path, RUNS, PREREG, seen)
-    assert errors == [] and C.consistency(seen) == [] and len(hashes) == 3
+    assert errors == [] and C.consistency(seen) == [] and len(hashes) == 6       # result files and .meta.json
 
 
 def test_missing_extra_error_and_short_files_are_reported(tmp_path):
@@ -68,15 +68,31 @@ def test_energy_columns_inputs_code_and_protocol_are_checked(tmp_path):
     text = "\n".join(errors + C.consistency(seen))
     assert "energy factor inactive but battery_min_wh filled" in text
     assert "DATA/processed/s.csv differs between runs" in text and "code_sha256 differs between runs" in text
+    assert "different code versions" in text
     assert "differs from the frozen protocol" in text
 
 
+def test_listed_code_versions_are_accepted_across_folders(tmp_path, monkeypatch):
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir(); b.mkdir()
+    write_run(a, RUNS[0], INPUTS, code="c0"); write_run(b, RUNS[0], INPUTS, code="c1")
+    seen = {}
+    assert C.validate(a, RUNS[:1], PREREG, seen)[0] == [] and C.validate(b, RUNS[:1], PREREG, seen)[0] == []
+    monkeypatch.setattr(C, "versions", lambda: {})
+    assert any("code_sha256 differs" in e for e in C.consistency(seen))
+    monkeypatch.setattr(C, "versions", lambda: {"code_sha256": {"c0": "1.0", "c1": "1.1"}})
+    assert C.consistency(seen) == []
+
+
 def test_stored_results_match_manifest():
-    man = ROOT / "results/experiment/MANIFEST_normal.json"
-    if not man.exists():
-        pytest.skip("no stored results in this copy (python scripts/check_results.py --write)")
+    man = ROOT / "results/experiment/MANIFEST_all.json"
+    if not (ROOT / "results/experiment/normal").exists() or not man.exists():
+        pytest.skip("no stored results in this copy")
     reg = json.loads((ROOT / "results/experiment/PREREGISTRATION.json").read_text(encoding="utf-8"))["sha256"]
     errors, hashes = C.validate(ROOT / "results/experiment/normal", C.expected_runs(), reg)
-    files = json.loads(man.read_text(encoding="utf-8"))["files"]
-    files = {k.rsplit("/", 1)[-1]: v for k, v in files.items()}
-    assert errors == [] and hashes == files
+    prefix = "results/experiment/normal/"
+    files = {k[len(prefix):]: v for k, v in json.loads(man.read_text(encoding="utf-8"))["files"].items()
+             if k.startswith(prefix)}
+    assert errors == []
+    assert {n for n in hashes if n.endswith(".csv")} == {n for n in files if n.endswith(".csv")}
+    assert all(hashes[n] == h for n, h in files.items())

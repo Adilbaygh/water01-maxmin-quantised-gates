@@ -11,7 +11,10 @@ For every case × method (LXB, B0, B3), over the years computed for that case on
   d_B0, d_B3         — LXB − baseline, mean daily λ difference (iot and phys);
   r_min_user         — least satisfied user under iot and its mean r;
   radio_off_share    — share of steps with the radio off (energy factor); battery_min_wh — lowest charge in the season;
-  dropped_share      — share of messages lost or over budget.
+  blocked_share      — command packets refused by the window budget / packets attempted (attempted = transmitted +
+                       blocked); lost_share — packets lost on the channel / packets transmitted; failed_share —
+                       (blocked + lost) / attempted. The three need the counters "blocked" and "lost" of the result
+                       files; for older files without them they are left blank.
 For iot-only cases (deadband, energy, communication), phys is the baseline (normal) result: the IoT assumptions do
 not affect phys.
 Usage: python scripts/summarize_sensitivity.py  ->  results/sensitivity_summary.csv and .md
@@ -61,6 +64,19 @@ def season_sum(df, col):
     return float(df.groupby("year")[col].first().sum())
 
 
+def link_shares(q):
+    """Denominators of the communication counters: attempted = transmitted + blocked."""
+    nan = dict(blocked_share=np.nan, lost_share=np.nan, failed_share=np.nan)
+    if "blocked" not in q.columns or "lost" not in q.columns or q["blocked"].isna().any():
+        return nan
+    sent, blocked, lost = (season_sum(q, c) for c in ("messages", "blocked", "lost"))
+    attempted = sent + blocked
+    if attempted <= 0:
+        return dict(blocked_share=0.0, lost_share=0.0, failed_share=0.0)
+    return dict(blocked_share=blocked / attempted, lost_share=lost / sent if sent > 0 else np.nan,
+                failed_share=(blocked + lost) / attempted)
+
+
 def row_for(case, folder_phys, folder_iot, years):
     phys = collect(folder_phys, years, "phys"); iot = collect(folder_iot, years, "iot")
     rows = []
@@ -86,8 +102,7 @@ def row_for(case, folder_phys, folder_iot, years):
         r["radio_off_share"] = season_sum(q, "radio_off_steps") / steps
         r["battery_min_wh"] = float(q.groupby("year").battery_min_wh.first().min()) \
             if q.battery_min_wh.notna().any() else np.nan
-        sent = season_sum(q, "messages")
-        r["dropped_share"] = season_sum(q, "dropped") / sent if sent > 0 else np.nan
+        r.update(link_shares(q))
         r["lp_fallbacks"] = season_sum(q, "lp_fallbacks") + season_sum(p, "lp_fallbacks")
         rows.append(r)
     return rows
@@ -117,12 +132,12 @@ def main():
     t = pd.DataFrame(rows)
     t.to_csv(a.out + ".csv", index=False)
     lines = ["| Case | Method | Years | λ phys | λ IoT | Π1 (ratio of means) | Π1 median | LXB−B0 IoT | LXB−B3 IoT | "
-             "Lowest r (IoT) | Radio off | Battery min, Wh | Message loss |", "|" + "---|" * 13]
+             "Lowest r (IoT) | Radio off | Battery min, Wh | Blocked / attempted | Lost / transmitted |", "|" + "---|" * 14]
     for _, r in t.iterrows():
         f = lambda k, fmt="{:+.4f}": fmt.format(r[k]) if k in r and pd.notna(r[k]) else ""
         lines.append(f"| {r.case} | {r.method} | {r.years} | {r.lam_phys:.4f} | {r.lam_iot:.4f} | {f('pi1_ratio', '{:.4f}')} | {f('pi1_median', '{:.4f}')} | "
                      f"{f('d_B0_iot')} | {f('d_B3_iot')} | {r.r_min_user} | {r.radio_off_share:.3%} | "
-                     f"{f('battery_min_wh', '{:.0f}')} | {f('dropped_share', '{:.2%}')} |")
+                     f"{f('battery_min_wh', '{:.0f}')} | {f('blocked_share', '{:.2%}')} | {f('lost_share', '{:.2%}')} |")
     Path(a.out + ".md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     print(f"-> {a.out}.csv, {a.out}.md")

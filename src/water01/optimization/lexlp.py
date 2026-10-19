@@ -191,7 +191,8 @@ def delayed_inflow(q_in_hist, q_in_future, tau, dt, d):
 def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps_today, K, dt, eta, A_s, d,
                    chord_set, capacity, h_lo, h_hi, h_ref, q_prev=None, dq_max=None, level_weight=None,
                    slack_weight=None, next_weight=None, track_weight=None, move_weight=None, terminal_band=None,
-                   durations=None, objective="maxmin", weights=None):
+                   durations=None, objective="maxmin", weights=None, share="remaining", delivered_today=None,
+                   target_today=None):
     """15-minute execution LP (Sections 2.4-2.5). Variables: q_j[k] (J outlets, K steps), h_L[k+1],
     μ (today), ν (start of tomorrow), level deviation e[k] ≥ |h_L − h_ref|, level-bound violation s[k] ≥ 0,
     excess withdrawal today at the regulators o_j ≥ 0.
@@ -222,6 +223,11 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
     q_in_hist: last d inflows (oldest first); q_in_future: K forecast inflows (m³/s).
     durations: interval lengths [s] (move blocking); None means all equal Δt; the first d intervals must equal Δt
     (the delay acts there). q is constant within an interval. steps_today: number of intervals belonging to today.
+    share="remaining" (LXB): μ is the common share of the remaining daily plan, μ·(x_j − V̂_j) ≤ Σ_k q_j Δt, so that a
+    user who has already received a larger share keeps receiving the same share of its remainder (proportional
+    recovery). share="final" (exploratory LXB-F): μ is the common share of the whole daily plan at the end of the day,
+    μ·x_j ≤ V̂_j + Σ_k q_j Δt, i.e. the final daily satisfaction relative to the plan; delivered_today (V̂_j) and
+    target_today (x_j) are then required.
     Returns: q [J×K], h [K+1], μ, ν, total level violation."""
     cfgw = lambda x, key: value(key) if x is None else x                   # weights from configuration
     level_weight = cfgw(level_weight, "execution_level_weight"); slack_weight = cfgw(slack_weight, "execution_slack_weight")
@@ -276,9 +282,19 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
     # μ, ν: volume requirements μ·need ≤ Σ q τ. Each row is divided by max(need, 1 m³): when the remainder is at
     # round-off level (e.g. 2·10⁻¹³ m³), a coefficient 1/need of ~10¹⁵ would cause a HiGHS "Model error".
     # For need ≥ 1 m³ the row is normalised by need; need < 1 m³ is regarded as already fulfilled.
+    final = share == "final"
+    if share not in ("remaining", "final"):
+        raise ValueError("share: 'remaining' or 'final'")
+    if final and (delivered_today is None or target_today is None):
+        raise ValueError("share='final' requires delivered_today and target_today")
     for j in range(J):
         need_today = remaining_today[j]
-        if need_today > 0 and steps_today > 0:
+        if final:                                              # μ·x_j − Σ q τ ≤ V̂_j
+            x_j, v_j = float(target_today[j]), float(delivered_today[j])
+            if x_j > 0 and steps_today > 0:
+                s_ = max(x_j, 1.0)
+                ub([(qi(j, k), -tau[k] / s_) for k in range(steps_today)] + [(mu_col(j), x_j / s_)], v_j / s_)
+        elif need_today > 0 and steps_today > 0:
             s_ = max(need_today, 1.0)
             ub([(qi(j, k), -tau[k] / s_) for k in range(steps_today)] + [(mu_col(j), need_today / s_)], 0.0)
         need_next = rate_next[j] * tau[steps_today:].sum()
@@ -296,6 +312,12 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
                         ub([(qi(j, k), sgn), (qi(j, k - 1), -sgn), (irt + qi(j, k), -1.0)],
                            dq_max[j] * 0.5 * (tau[k] + tau[k - 1]) / dt)
     for j in range(J - 1):                                     # soft: a regulator takes no more than the share μ
+        if final:                                              # V̂_j + Σ q τ ≤ μ·x_j + o_j
+            x_j, v_j = float(target_today[j]), float(delivered_today[j])
+            scale = max(x_j, 1.0)
+            ub([(qi(j, k), tau[k] / scale) for k in range(steps_today)] + [(mu_col(j), -x_j / scale), (io + j, -1.0)],
+               -v_j / scale)
+            continue
         need_today = max(remaining_today[j], 0.0)
         scale = max(need_today, 1.0)
         ub([(qi(j, k), tau[k] / scale) for k in range(steps_today)] + [(mu_col(j), -need_today / scale), (io + j, -1.0)],

@@ -19,6 +19,8 @@ results/superseded/.
 Usage: python scripts/evaluate_hypotheses.py [--scenario normal]
        python scripts/evaluate_hypotheses.py --scenario block_5 --data normal    # 5-day bootstrap blocks
        python scripts/evaluate_hypotheses.py --bootstrap circular               # circular blocks (or season)
+       python scripts/evaluate_hypotheses.py --bootstrap calendar               # moving blocks on the full calendar
+       python scripts/evaluate_hypotheses.py --bootstrap season --inference season   # seasons as units
 """
 import argparse
 import itertools
@@ -111,20 +113,22 @@ def aligned(a, b):
 
 def daily_price(df, method, tuned, iot):
     """P1[p] = (lambda_phys - lambda_F) / lambda_phys on days with lambda_phys[p] > 0; also returns the number of
-    days with lambda_phys = 0."""
+    days with lambda_phys = 0. With the calendar bootstrap, the excluded days stay in the series as NaN."""
     ph, it, _ = aligned(series(df, method, tuned, "phys", "lambda"), series(df, method, tuned, iot, "lambda"))
     ok = ph > 0
-    return ((ph - it) / ph)[ok], int((~ok).sum())
+    pi = (ph - it) / ph.where(ok)
+    return (pi if SCHEME == "calendar" else pi[ok]), int((~ok).sum())
 
 
 SCHEME = "block"                                           # bootstrap scheme, set from --bootstrap
+TEST = "wilcoxon"                                          # test of the daily comparisons, set from --inference
 
 
 def run_family(rows, h, comparison, variant, diffs, years, kind, seed, role="primary", note="", eps=None):
     if not diffs:
         rows.append(dict(hypothesis=h, comparison=comparison, variant=variant, role=role, decision="no data", note=note))
         return
-    for r in evaluate_family(diffs, years, kind, eps=eps, seed=seed, scheme=SCHEME):
+    for r in evaluate_family(diffs, years, kind, eps=eps, seed=seed, scheme=SCHEME, test=TEST):
         n = len(diffs[r.baseline])
         rows.append(dict(hypothesis=h, comparison=f"{comparison}{r.baseline}", variant=variant, role=role,
                          estimate=r.estimate, ci_low=r.ci_low, ci_high=r.ci_high, p_raw=r.p_raw, p_holm=r.p_holm,
@@ -162,11 +166,12 @@ RECORDS_SUPPLY = ROOT / "DATA/processed/rashod_2010_2019_daily.csv"   # days wit
 def evaluate(df, seed, supply_csv=RECORDS_SUPPLY):
     fam = holm_families(); rows = []
     methods = set(df.method)
-    if not Path(supply_csv).exists():
-        sys.exit(f"{Path(supply_csv).name} is needed for H6 (days with S < Q_c); the operating records "
-                 "(DATA/processed) are available to reviewers on request")
-    sup = pd.read_csv(supply_csv, parse_dates=["date"])
-    low = set(sup[sup.kegeyli_Q.fillna(0) < value("Q_c_m3s")].date.dt.strftime("%Y-%m-%d"))
+    if Path(supply_csv).exists():
+        sup = pd.read_csv(supply_csv, parse_dates=["date"])
+        low = set(sup[sup.kegeyli_Q.fillna(0) < value("Q_c_m3s")].date.dt.strftime("%Y-%m-%d"))
+    else:                                                  # H6 needs the days with S < Q_c (closed records)
+        print(f"{Path(supply_csv).name} not found: H6 is reported as not available", flush=True)
+        low = None
     for tuned, iot in VARIANTS:                                       # H1, H5, H6 for every variant
         v = df[(df.tuned == tuned) & (df.iot == iot) & df.method.isin(["B0", "B1", "B2", "B3", "LXB", "Oracle"])]
         if v.empty:
@@ -184,6 +189,11 @@ def evaluate(df, seed, supply_csv=RECORDS_SUPPLY):
                     d[b], yrs = paired(v, b, "LXB", "lambda")
         run_family(rows, "H5", "gap_LXB − gap_", var, d, yrs, "decrease", seed, role="descriptive",
                    note="sign-reversed copy of H1 (the Oracle cancels in the paired difference)")
+        if low is None:
+            rows.extend(dict(hypothesis="H6", comparison=f"LXB − {b}", variant=var, role="primary",
+                             decision="not available", note="needs the operating records (DATA/processed)")
+                        for b in fam["H6"])
+            continue
         v6 = v[v.date.isin(low)].copy()
         v6["lost_small"] = v6[[f"lost_{u}" for u in SMALL]].sum(axis=1)
         d = {}
@@ -217,6 +227,8 @@ def evaluate(df, seed, supply_csv=RECORDS_SUPPLY):
             a, b, yrs = aligned(series(df, "LXB", "tuned", "phys", col),
                                 series(df, "LXB-noS3", "tuned", "phys", col))
             ok = a.notna().to_numpy() & b.notna().to_numpy()
+            if SCHEME == "calendar":                           # keep the calendar; NaN marks the missing days
+                ok = np.ones_like(ok)
             run_family(rows, "H3", f"{col}: LXB − ", "tuned/phys", {"LXB-noS3": (a - b).to_numpy()[ok]}, yrs[ok],
                        kind, seed, role="primary" if col == "Z3" else "tolerance")
     else:
@@ -285,20 +297,23 @@ def archive_previous(path):
 
 
 def main():
-    global SCHEME
+    global SCHEME, TEST
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scenario", default="normal")
     ap.add_argument("--data", default=None,
                     help="result folder results/experiment/<data> (default: the scenario name); e.g. "
                          "--scenario block_5 --data normal changes only the bootstrap block length")
-    ap.add_argument("--bootstrap", default="block", choices=("block", "circular", "season"),
+    ap.add_argument("--bootstrap", default="block", choices=("block", "circular", "season", "calendar"),
                     help="bootstrap scheme of the daily comparisons (pre-specified: block)")
+    ap.add_argument("--inference", default="daily", choices=("daily", "season"),
+                    help="test of the daily comparisons: daily Wilcoxon (pre-specified) or an exact sign-flip test "
+                         "of the seasonal means (seasons as independent units)")
     a = ap.parse_args()
-    SCHEME = a.bootstrap
+    SCHEME = a.bootstrap; TEST = "wilcoxon" if a.inference == "daily" else "season"
     cfg = load_config(scenario=a.scenario)
     res, table = evaluate(load_all(a.data or cfg.scenario), cfg.seed)
     print(to_markdown(res))
-    suffix = "" if a.bootstrap == "block" else f"_{a.bootstrap}"
+    suffix = ("" if a.bootstrap == "block" else f"_{a.bootstrap}") + ("" if a.inference == "daily" else "_seasontest")
     path = ROOT / f"results/hypotheses_summary_{cfg.scenario}{suffix}.csv"
     archive_previous(path)
     res.to_csv(path, index=False)
@@ -306,7 +321,8 @@ def main():
     if table is not None and not suffix:
         table.to_csv(ROOT / f"results/shapley_by_year_{cfg.scenario}.csv", index=False)
     write_metadata(path, ROOT, config_inputs(cfg, ROOT) + ("requirements/hypotheses.md",),
-                   {"scenario": cfg.scenario, "data": a.data or cfg.scenario, "bootstrap": a.bootstrap}, cfg)
+                   {"scenario": cfg.scenario, "data": a.data or cfg.scenario, "bootstrap": a.bootstrap,
+                    "inference": a.inference}, cfg)
     print(f"-> {path.relative_to(ROOT).as_posix()}")
 
 

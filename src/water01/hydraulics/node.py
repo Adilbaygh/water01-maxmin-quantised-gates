@@ -6,7 +6,7 @@ tailwater level of the check structure is taken from the Manning rating curve of
 levels are not given in the passport and are assumed (covered by the sensitivity analysis). All levels are measured
 from the reach bed; no bed-level step at the structure is assumed.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from scipy.optimize import brentq

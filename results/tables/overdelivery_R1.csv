@@ -1,0 +1,4 @@
+method,user,days,demand_m3_day_early,delivered_m3_day_early,ratio_mean_early,ratio_max_early,ratio_min_early,ratio_mean,early_days_delivered,delivered_m3_day_early_pos,delivered_m3_day_early_pos_min,delivered_m3_day_early_max,days_above_1p05,excess_share
+LXB,R-1,1830,25.92,0.0,0.0,0.0,0.0,0.7677750706889155,0,,,0.0,10,0.001124607168416029
+B3V,R-1,1830,25.92,0.0,0.0,0.0,0.0,0.7684468480859608,0,,,0.0,5,0.0017611252849805466
+LXB-DA,R-1,1830,25.92,41.48575077862975,1.60053050843479,2.792195616891334,0.0,0.8694320747712341,77,53.877598413804876,51.103145848565305,72.37371038982337,188,0.006380931759402796

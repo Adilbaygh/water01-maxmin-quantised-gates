@@ -86,8 +86,8 @@ class IntradayExecutor:
     """15-minute execution LP (optimization.lexlp.solve_intraday), shared by LXB, Oracle and B2.
     Re-solved at every step from the measured (estimated) level and delivered volume; the first step is applied."""
 
-    def __init__(self, objective="maxmin"):
-        self.objective = objective
+    def __init__(self, objective="maxmin", share="remaining"):
+        self.objective, self.share = objective, share
         self.q_prev = None; self.last = {}
 
     def reset(self):
@@ -104,7 +104,10 @@ class IntradayExecutor:
         remaining = np.maximum(target - state.delivered_today, 0.0)
         sol = solve_intraday(state.inflow_history, q_future, state.level, remaining, next_rate, n_today, K, m.dt,
                              m.eta, m.A_s, m.d, m.chords, m.capacity, m.h_lo, m.h_hi, m.h_ref, self.q_prev,
-                             m.dq_max, durations=tau, objective=self.objective, weights=weights)
+                             m.dq_max, durations=tau, objective=self.objective, weights=weights,
+                             **({} if self.share == "remaining" else
+                                dict(share=self.share, delivered_today=np.asarray(state.delivered_today, float),
+                                     target_today=np.asarray(target, float))))
         q = clip_roundoff(sol["q"][:, 0])
         self.q_prev = q
         self.last = {"mu": sol["mu"], "nu": sol["nu"], "slack": sol["slack"], "h_pred": sol["h"][1]}
@@ -134,6 +137,17 @@ class LXBController(Controller):
             self.next_rate = x_next / (hz.steps_per_day * m.dt)
         q = self.exec(state, supply, m, hz, self.target, self.next_rate)
         return Command(flows=q, target=self.target.copy(), info=dict(self.exec.last))
+
+
+class LXBFinalShareController(LXBController):
+    """Exploratory variant (LXB-F): as LXB, but the execution LP maximises the common share of the whole daily plan
+    reached at the end of the day (final daily satisfaction relative to the plan) instead of the common share of the
+    remaining plan (solve_intraday, share="final"). Daily plan as in LXB."""
+    name = "LXB-F"
+
+    def __init__(self):
+        self.exec = IntradayExecutor("maxmin", share="final")
+        self.reset()
 
 
 class LXBNoStage3Controller(LXBController):

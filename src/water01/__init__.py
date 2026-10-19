@@ -10,4 +10,4 @@ Package structure (layers from bottom to top; each layer imports only the layers
     simulation    -- scenarios and data, plant loop, runner;
     evaluation    -- metrics and IoT price, statistics, hypothesis decisions.
 """
-__version__ = "1.0.0"
+__version__ = "1.1.0"

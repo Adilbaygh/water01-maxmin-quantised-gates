@@ -1,0 +1,10 @@
+{
+  "code_sha256": {
+    "294867621fc6a5435f0894ccae37f7572429c0f890205359a7ae09b1bff30a19": "water01 1.0.0: main, sensitivity and exploratory runs of the first release",
+    "38c226bfc8ca0fcc604d1b2ce8beda8ce8f9f1154618f5cfd29d7689ddf0ef82": "water01 1.1.0: adds the final-share executor (LXB-F), the pulse rule for B3V (B3V-DA), separate counters of blocked and lost packets, persistent sensor bias, plant/controller efficiency mismatch, outlet rating factors and the command-step case; runs of 1.0.0 are reproduced unchanged (results/verification/rerun/comparison.csv)"
+  },
+  "configs/kegeyli_reference.yaml": {
+    "1aab0fa83d0c5024761f78f1857f00a9d6c74ff9892e1091b09d9bf4159833f3": "first release",
+    "dd374fa8f1d0a2c149692bc30cf6b14ced6db263548b4bc3b14718eb2c5d8390": "status of eta: derived instead of observed (value unchanged)"
+  }
+}

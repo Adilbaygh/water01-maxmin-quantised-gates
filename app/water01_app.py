@@ -17,6 +17,7 @@ The interface only reads the stored results and calls the model; it does not cha
 import io
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -381,7 +382,27 @@ def page_run():
         show_run(st.session_state["last_run"], satisfaction)
 
 
+@st.cache_resource
+def simulation_lock():
+    """One lock per server process: the model keeps its active configuration in a module-level variable, so two
+    sessions must not run simulations with different scenarios at the same time."""
+    return threading.Lock()
+
+
 def execute(paths, source, scenario, methods, tuned, factors, start, days):
+    lock = simulation_lock()
+    if not lock.acquire(blocking=False):
+        st.warning("Another simulation is running on this server. Please wait until it has finished and run again.")
+        return
+    try:
+        _execute(paths, source, scenario, methods, tuned, factors, start, days)
+    finally:
+        from water01.simulation.scenarios import load_config
+        load_config()                                               # back to the reference configuration
+        lock.release()
+
+
+def _execute(paths, source, scenario, methods, tuned, factors, start, days):
     from water01.simulation.runner import run_closed_loop_period
     from water01.simulation.scenarios import iot_scenario, load_config
     start = pd.Timestamp(start)

@@ -1,7 +1,9 @@
 """Configuration (YAML): reference + scenario. Code reads parameters from here and does not hard-code them.
 
     configs/kegeyli_reference.yaml          -- all parameters (value, status, source)
-    configs/scenarios/<name>.yaml            -- `overrides:` (only the parameters that change)
+    configs/scenarios/<name>.yaml            -- `overrides:` (only the parameters that change) and, for options
+                                                that the reference case does not use, `additions:` (new parameters
+                                                with value, status and source; the reference file stays unchanged)
 
 load(reference, scenario) -> Config; activate(cfg) makes it active (value(name) reads from it).
 Each process (including parallel experiment workers) loads and activates its own configuration.
@@ -101,6 +103,14 @@ def _apply(params, overrides):
             params[name] = Parameter(node, old.status, old.source, old.section)
 
 
+def _add(params, additions):
+    """Scenario-only options: parameters absent from the reference configuration (section "scenario")."""
+    for name, node in (additions or {}).items():
+        if name in params:
+            raise KeyError(f"Scenario adds a parameter that already exists: {name} (use overrides)")
+        params[name] = _parse(node, "scenario")
+
+
 def _sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -122,6 +132,7 @@ def load(reference=None, scenario=None):
     if sp.exists():
         sdoc = yaml.safe_load(sp.read_text(encoding="utf-8")) or {}
         _apply(params, sdoc.get("overrides"))
+        _add(params, sdoc.get("additions"))
         name = (sdoc.get("meta") or {}).get("name", sp.stem)
         files[str(sp)] = _sha(sp)
     elif scenario not in (None, "reference", "normal"):
@@ -159,3 +170,9 @@ def active():
 
 def value(name):
     return active().value(name)
+
+
+def optional(name, default=None):
+    """Value of a scenario-only option (see `additions`), or `default` when the active configuration lacks it."""
+    params = active().params
+    return params[name].value if name in params else default

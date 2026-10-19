@@ -13,7 +13,7 @@ import math
 from ..control import CONTROLLERS, Demand, Horizon, b3_proportional, lxb_receding, oracle
 from ..control.model import ControllerModel
 from ..domain.geometry import Reach
-from ..domain.passport import PARAMETERS, value
+from ..domain.passport import PARAMETERS, optional, value
 from ..evaluation.metrics import compute
 from ..hydraulics.node import DustlikNode, untuned_factors
 from ..optimization.constraints import command_limit
@@ -119,11 +119,14 @@ def run_closed_loop_period(method, supply_csv, demand_csv, cfg, start, days, tun
     limit = select_limit(load_supply(supply_csv, blank_policy="zero"), pd.Timestamp(start).year)
     supply = supply.assign(S_m3s=supply.S_m3s * value("supply_scale"))
     dates = pd.date_range(start, periods=days, freq="D")
-    eta = value("eta"); eta_true = eta if eta_true is None else eta_true
+    eta = value("eta")
+    if eta_true is None:                                       # plant/controller mismatch of η (sensitivity case)
+        eta_true = optional("eta_true", eta)
     D, A, A_lim = daily_arrays(supply, demand, limit, dates, eta)
-    U = np.array(value("outlet_capacity_m3s"))[:, None] * SECONDS_PER_DAY * np.ones((1, days))
     cd_factor, offtake_factor = untuned_factors(tuned)
-    node_true = DustlikNode(offtake_factor=offtake_factor)
+    rating = optional("outlet_rating_factors")                 # outlet-specific rating error (sensitivity case)
+    node_true = DustlikNode(offtake_factor=offtake_factor if rating is None
+                            else offtake_factor * np.asarray(rating, float))
     node_model = DustlikNode(cd=value("gate_cd") * cd_factor)
     model = dataclasses.replace(build_controller_model(node_model, cfg, dt), pulse_flow=pulse_flow_for(node_model, iot))
     horizon = Horizon.from_config()

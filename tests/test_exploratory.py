@@ -19,12 +19,13 @@ from _inputs import DEM, SUP  # noqa: E402
 
 
 def test_exploratory_cases_are_complete():
-    from run_experiment import EXPLORATORY
-    for case, (methods, tuned, iots) in EXPLORATORY.items():
+    from run_experiment import EXPLORATORY, groups
+    for case in EXPLORATORY:
         assert (CONFIG_DIR / "scenarios" / f"{case}.yaml").exists(), case
         assert load(scenario=case).scenario == case
-        assert set(methods) <= set(CONTROLLERS), case
-        assert set(tuned) <= {"tuned", "untuned"} and set(iots) <= {"phys", "iot"}
+        for methods, tuned, iots in groups(case):
+            assert set(methods) <= set(CONTROLLERS), case
+            assert set(tuned) <= {"tuned", "untuned"} and set(iots) <= {"phys", "iot"}
 
 
 def test_independent_seeds_differ():

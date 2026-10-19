@@ -12,7 +12,9 @@ An interval that excludes zero in the expected direction without the p-value or 
 from dataclasses import dataclass
 
 from ..domain.passport import value
-from .statistics import holm, moving_block_bootstrap_ci, sign_consistency, wilcoxon_paired
+import numpy as np
+
+from .statistics import holm, moving_block_bootstrap_ci, season_signflip, sign_consistency, wilcoxon_paired
 
 
 def holm_families():
@@ -52,15 +54,24 @@ def decide(ci_low, ci_high, kind, eps=0.0, p_adj=0.0, sign_share=1.0, alpha=None
     raise ValueError("kind must be 'increase' or 'decrease'")
 
 
-def evaluate_family(diffs, years, kind, eps=None, alpha=None, n_boot=None, seed=0, block=None, scheme="block"):
+def evaluate_family(diffs, years, kind, eps=None, alpha=None, n_boot=None, seed=0, block=None, scheme="block",
+                    test="wilcoxon"):
     """diffs: {baseline: daily differences}; years: season of every day. Holm is applied within the family.
-    eps, alpha, n_boot and block default to the configuration (section hypotheses)."""
+    eps, alpha, n_boot and block default to the configuration (section hypotheses).
+    test = "wilcoxon" (pre-specified: daily Wilcoxon signed-rank test) or "season" (exact sign-flip test of the
+    seasonal mean differences, seasons as independent units). NaN entries mark excluded days (scheme "calendar")."""
     eps = value("epsilon_lambda") if eps is None else eps
     alpha = value("alpha") if alpha is None else alpha
     n_boot = value("bootstrap_replicates") if n_boot is None else n_boot
     block = value("bootstrap_block_days") if block is None else block
     names = list(diffs)
-    raw = [wilcoxon_paired(diffs[b])[1] for b in names]
+    if test not in ("wilcoxon", "season"):
+        raise ValueError("test must be 'wilcoxon' or 'season'")
+    def clean(x):                               # days excluded under the calendar scheme are NaN
+        m = np.isnan(np.asarray(x, float))
+        return np.asarray(x, float)[~m] if m.any() else x
+    raw = [wilcoxon_paired(clean(diffs[b]))[1] if test == "wilcoxon" else season_signflip(diffs[b], years)[1]
+           for b in names]
     adj = holm(raw)
     direction = +1 if kind == "increase" else -1
     out = []

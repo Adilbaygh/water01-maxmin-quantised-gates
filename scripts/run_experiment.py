@@ -66,6 +66,9 @@ SENSITIVITY = {
     # stress tests of the energy and communication layers (inactive in the baseline)
     "energy_moderate": ("iot",), "energy_severe": ("iot",), "communication_loss": ("iot",),
     "communication_budget_2": ("iot",), "communication_budget_1": ("iot",),
+    # plant/controller mismatch and persistent errors (efficiency, outlet rating, tail water, level sensor)
+    "eta_true_low": ("phys", "iot"), "eta_fixed_demand_low": ("phys", "iot"), "rating_outlets": ("phys", "iot"),
+    "tailwater_high": ("phys", "iot"), "sensor_bias_pos": ("iot",), "sensor_bias_neg": ("iot",),
 }
 
 EXPL = ROOT / "results/exploratory"
@@ -80,7 +83,28 @@ EXPLORATORY = {
     "forecast_loo": (("LXB",), ("tuned",), ("phys", "iot")),                # forecast without the simulated season
     "blank_carry": (("LXB", "B0", "B3"), ("tuned",), ("phys", "iot")),      # blank supply entries: nearest record
     "untuned_reverse": (("LXB", "B0", "B3", "B3V"), ("untuned",), ("phys", "iot")),   # reverse gate mismatch
+    "final_share": (("LXB-F",), ("tuned", "untuned"), ("phys", "iot")),     # execution LP on the final daily share
+    "b3v_deadband": (("B3V-DA",), ("tuned", "untuned"), ("iot",)),          # B3V with the pulse rule of LXB-DA
+    "dt_450": [(("LXB", "B3"), ("tuned",), ("phys", "iot")),                  # command step 7.5 min
+               (("LXB-DA",), ("tuned",), ("iot",))],
 }
+
+
+def groups(case):
+    """Groups (methods, tuned, iot) of an exploratory case (one tuple or a list of tuples)."""
+    spec = EXPLORATORY[case]
+    return spec if isinstance(spec, list) else [spec]
+
+
+def runtime_inputs(cfg, iot, year):
+    """Further input files of a run: the NASA POWER file of the season (energy factor) and the official 2021 limit
+    profile (limit_source = limit_2021)."""
+    out = []
+    if "energy" in factors_of(iot):
+        out.append(f"DATA/raw/nasa_power/nasa_power_hourly_{year}.csv")
+    if cfg.limit_source == "limit_2021":
+        out.append("DATA/processed/limit_2021_kegeyli_decadal.csv")
+    return tuple(p for p in out if (ROOT / p).exists())
 
 
 def factors_of(code):
@@ -130,6 +154,7 @@ def run_job(method, year, tuned, iot, start=None, days=None, scenario="normal", 
     df["storage_change_share_season"] = out["storage_change_share"]
     df["mass_error"] = res.mass_error
     df["messages"] = res.messages_sent; df["dropped"] = res.messages_dropped
+    df["blocked"] = res.messages_blocked; df["lost"] = res.messages_lost   # dropped = blocked + lost
     df["lp_fallbacks"] = FALLBACKS["count"]                # solves that needed the HiGHS fallback path
     df["lex_violations"] = LEX_CHECK["violations"]          # solves in which a retained optimum was violated
     df["interlock_steps"] = res.interlock_steps; df["relief_steps"] = res.relief_steps
@@ -138,7 +163,8 @@ def run_job(method, year, tuned, iot, start=None, days=None, scenario="normal", 
     path = out_dir / f"{method}_{year}_{tuned}_{iot}.csv"
     df.to_csv(path, index=False)
     path.with_suffix(".error.txt").unlink(missing_ok=True)   # error file left by an earlier attempt
-    write_metadata(path, ROOT, config_inputs(cfg, ROOT) + DATA,
+    extra = runtime_inputs(cfg, iot, year)
+    write_metadata(path, ROOT, config_inputs(cfg, ROOT) + DATA + extra,
                    {"method": method, "year": year, "tuned": tuned, "iot": iot, "start": start, "days": days,
                     "seed": cfg.seed + year}, cfg)
     return path.name, out["lambda"], time.time() - t0
@@ -181,13 +207,15 @@ def check_preregistration(freeze):
 def compare_with_stored(new, stored):
     """Largest absolute difference of every numeric column between a rerun and the stored result."""
     a, b = pd.read_csv(new), pd.read_csv(stored)
+    added = [c for c in a.columns if c not in b.columns]       # columns added by a later code version
+    a = a.drop(columns=added)
     if a.shape != b.shape or list(a.columns) != list(b.columns):
         return {"shape": f"{a.shape} vs {b.shape}"}
     num = a.select_dtypes("number").columns
     diff = (a[num] - b[num]).abs().max()
     same_text = all((a[c].astype(str) == b[c].astype(str)).all() for c in a.columns if c not in num)
     return {"max_abs_diff": float(diff.max()), "column": str(diff.idxmax()), "text_columns_equal": same_text,
-            "lambda_max_abs_diff": float(diff.get("lambda", np.nan))}
+            "lambda_max_abs_diff": float(diff.get("lambda", np.nan)), "columns_added": ",".join(added)}
 
 
 def parse_years(spec, cfg):
@@ -239,8 +267,8 @@ def main():
         check_preregistration(a.freeze)
     if a.exploratory:
         cases = select_cases(a.cases, EXPLORATORY, "exploratory")
-        jobs = [(m, y, t, i, c) for c in cases for y in years for t in EXPLORATORY[c][1]
-                for i in EXPLORATORY[c][2] for m in EXPLORATORY[c][0]]
+        jobs = [(m, y, t, i, c) for c in cases for (ms, tu, io) in groups(c) for y in years for t in tu
+                for i in io for m in ms]
         stored = {c: EXPL / c for c in cases}
     elif a.sensitivity:
         cases = select_cases(a.cases, SENSITIVITY, "sensitivity")
@@ -268,7 +296,7 @@ def main():
         factors_of(j[3])
     if not (a.force or a.verify):
         jobs = [j for j in jobs if not path(*j).exists()]
-    SLOW = ("LXB", "LXB-noS3", "LXB-DA", "Oracle", "B2")    # slow methods first, for a more even load
+    SLOW = ("LXB", "LXB-noS3", "LXB-DA", "LXB-F", "Oracle", "B2")    # slow methods first, for a more even load
     jobs.sort(key=lambda j: j[0] not in SLOW)
     print(f"Cases: {', '.join(dirs)}; jobs: {len(jobs)} (slow: {sum(j[0] in SLOW for j in jobs)}); "
           f"workers: {a.jobs}", flush=True)
