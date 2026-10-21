@@ -59,11 +59,11 @@ Without the operating records (see *Data*), *Run the model* uses the synthetic i
 |---|---|---|
 | `DATA/raw/nasa_power/` | hourly NASA POWER irradiance at the node, used by the energy model | yes (open data) |
 | `DATA/synthetic/` | generated supply and demand with the structure of the records (`scripts/make_synthetic_inputs.py`) | yes |
-| `DATA/processed/` | daily head discharge 2010–2019, decadal demand, 2021 limit and off-takes of the reach, derived from the operating records of the irrigation system | **no** |
+| `DATA/processed/` | daily head discharge 2010–2019, decadal demand at the node, official 2021 limit profile, and the 2020 dispatcher sheets of the Kegeyli canal, transcribed from the operating records of the irrigation system (`DATA/processed/README.md`) | yes |
 
-The operating records are third-party data. They are available from the corresponding author on reasonable request
-and are provided to the reviewers of the article. Their SHA-256 checksums are stored in the `.meta.json` file of every
-result, so that a copy received on request can be checked against the stored results.
+The processed operating records are those used by every reported run; their SHA-256 checksums are stored in the
+`.meta.json` file of every result and are checked by `scripts/check_results.py`. The original record sheets are not
+included.
 
 ## Installation and tests
 
@@ -72,8 +72,8 @@ python -m pip install -r requirements.txt          # pinned numpy, scipy, pandas
 python -m pytest -q
 ```
 
-The tests use the operating records when `DATA/processed/` is present and the synthetic inputs otherwise; the test
-of the official 2021 limit profile is then skipped. The tests cover the hydraulic plant (mass balance, steady profiles,
+The tests use the operating records in `DATA/processed/`; without them (for example in a copy without the data
+folder), they use the synthetic inputs, and the test of the official 2021 limit profile is skipped. The tests cover the hydraulic plant (mass balance, steady profiles,
 grid convergence), the lexicographic linear programs, the controllers, the IoT layer, the statistics and decision
 rules, provenance and determinism (Table S2 of the Supplementary Materials).
 
@@ -82,7 +82,13 @@ rules, provenance and determinism (Table S2 of the Supplementary Materials).
 Every run writes one CSV per controller × season × chain with a `.meta.json` file that records the software
 environment, the active configuration, and the SHA-256 checksums of the source code and of the inputs.
 
-From the stored results (no records needed):
+Three levels of reproduction are possible. (1) Integrity: `check_results.py --all` checks that every stored result is
+complete, numerically valid (finite satisfactions in [0, 1], non-negative volumes, mass error, retained optima,
+packet counters) and was computed with the current code and inputs. (2) Evaluation: the hypothesis tests, the
+exploratory comparisons, the tables and the figures are recomputed from the stored daily results. (3) Simulation:
+every season is rerun from the operating records in `DATA/processed/`.
+
+From the stored results:
 
 ```bash
 python scripts/make_results_tables.py          # Tables 6-8, S6, S7 and the numbers of the text -> results/tables/
@@ -113,17 +119,21 @@ python scripts/summarize_sensitivity.py                    # -> results/sensitiv
 python scripts/summarize_exploratory.py                    # -> results/exploratory_summary.csv
 python scripts/compare_exploratory.py                      # -> results/exploratory_tests.csv (same options)
 python scripts/verification_convergence.py                 # grid and time-step convergence (Table S2a)
+python scripts/verification_pulse.py                       # gate pulse vs hydraulic step (Table S2b)
 ```
 
-A season takes about 2 min for B0, B1 and B3 and about 8 min for B2, LXB and the Oracle on one core; existing result
-files are skipped, so an interrupted sweep resumes where it stopped. Linear-program solutions can differ at the level
-of the solver tolerance between platforms and solver versions; in the environment of `requirements.txt`, the rerun of
-a stored season reproduced it exactly (`results/verification/rerun/comparison.csv`).
+A season takes about 2 min for B0, B1 and B3 and about 8 min for B2, LXB and the Oracle on one core; an existing result
+is kept only if its metadata show the current code and inputs and its table is complete (a table appears only after
+its metadata), so an interrupted sweep resumes where it stopped and results of other versions are recomputed. Linear-program solutions can differ at the level
+of the solver tolerance between platforms and solver versions; in the environment of `requirements.txt`, a stored season
+computed under Windows was reproduced under Linux to 4 × 10⁻¹⁶ in λ and 2 × 10⁻⁹ m³ in the delivered volumes
+(`results/verification/rerun/comparison.csv`).
 
-Every result records the checksum of the code that computed it. A folder of results must come from one code version;
-results of different folders may come from different versions only if each version is listed in
-`results/versions.json`, together with the evidence that the later version reproduces the earlier results
-(`check_results.py` enforces both rules). The bootstrap schemes are: `block` (pre-specified; 10-day moving blocks
+Every result records the checksum of the code that computed it. `check_results.py` requires every run to come from
+the current code and the current version of every recorded input; with `--accept-listed`, runs of earlier versions
+are accepted if each version is listed in `results/versions.json`, together with the evidence that the later version
+reproduces the earlier results. Evaluation outputs record the checksum of the whole code base and of the daily results
+they were computed from (`.meta.json`, `results/tables/PROVENANCE.json`). The bootstrap schemes are: `block` (pre-specified; 10-day moving blocks
 within each season), `circular`, `season` (whole seasons) and `calendar` (moving blocks on the full calendar of each
 season; excluded days stay in place and are left out of the replicate means).
 

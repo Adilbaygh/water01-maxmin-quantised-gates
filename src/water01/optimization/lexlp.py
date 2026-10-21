@@ -13,7 +13,7 @@ import numpy as np
 from scipy.optimize import linprog
 from scipy.sparse import coo_matrix, lil_matrix, vstack
 
-from ..domain.passport import value
+from ..domain.passport import optional, value
 from .constraints import daily_balance, effective_supply, retained_bounds, variable_bounds
 from .objectives import (satisfaction, var_index, variation_links, variation_rows, weighted_satisfaction_coeffs,
                          worst_case_rows)
@@ -192,7 +192,7 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
                    chord_set, capacity, h_lo, h_hi, h_ref, q_prev=None, dq_max=None, level_weight=None,
                    slack_weight=None, next_weight=None, track_weight=None, move_weight=None, terminal_band=None,
                    durations=None, objective="maxmin", weights=None, share="remaining", delivered_today=None,
-                   target_today=None):
+                   target_today=None, first_limit=None):
     """15-minute execution LP (Sections 2.4-2.5). Variables: q_j[k] (J outlets, K steps), h_L[k+1],
     μ (today), ν (start of tomorrow), level deviation e[k] ≥ |h_L − h_ref|, level-bound violation s[k] ≥ 0,
     excess withdrawal today at the regulators o_j ≥ 0.
@@ -228,6 +228,8 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
     recovery). share="final" (exploratory LXB-F): μ is the common share of the whole daily plan at the end of the day,
     μ·x_j ≤ V̂_j + Σ_k q_j Δt, i.e. the final daily satisfaction relative to the plan; delivered_today (V̂_j) and
     target_today (x_j) are then required.
+    first_limit: [J] discharges with fully open gates at the known current level h0; when given, (9) for the first
+    action is q_j[0] ≤ first_limit_j (exact) instead of the chords.
     Returns: q [J×K], h [K+1], μ, ν, total level violation."""
     cfgw = lambda x, key: value(key) if x is None else x                   # weights from configuration
     level_weight = cfgw(level_weight, "execution_level_weight"); slack_weight = cfgw(slack_weight, "execution_slack_weight")
@@ -269,6 +271,9 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
     for k in range(K):
         for j in range(J):                                     # (9)
             alpha, beta = chord_set[j]
+            if k == 0 and first_limit is not None:
+                ub([(qi(j, 0), 1.0), (isc + qi(j, 0), -1.0)], float(first_limit[j]))
+                continue
             for a_m, b_m in zip(alpha, beta):
                 if k == 0:
                     ub([(qi(j, 0), 1.0), (isc + qi(j, 0), -1.0)], a_m + b_m * h0)
@@ -281,7 +286,7 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
     after = K - steps_today
     # μ, ν: volume requirements μ·need ≤ Σ q τ. Each row is divided by max(need, 1 m³): when the remainder is at
     # round-off level (e.g. 2·10⁻¹³ m³), a coefficient 1/need of ~10¹⁵ would cause a HiGHS "Model error".
-    # For need ≥ 1 m³ the row is normalised by need; need < 1 m³ is regarded as already fulfilled.
+    # For need ≥ 1 m³ the row is normalised by need, otherwise by 1 m³; every positive remainder stays active.
     final = share == "final"
     if share not in ("remaining", "final"):
         raise ValueError("share: 'remaining' or 'final'")
@@ -355,7 +360,9 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
         c[im] = 0.0
         c[imj:imj + J] = -w / w.sum()
     c[ie:ie + K] = level_weight * tau / tau.sum()
-    c[is_:is_ + K] = slack_weight; c[io:io + J - 1] = slack_weight; c[it_] = slack_weight
+    # terminal condition: by default as heavy as the other soft constraints; a scenario can lower it
+    c[is_:is_ + K] = slack_weight; c[io:io + J - 1] = slack_weight
+    c[it_] = optional("execution_terminal_weight", slack_weight)
     # (9) and the gate rate are physical constraints, but at very low levels (e.g. on zero-supply days) the
     # chord/tangent becomes negative and conflicts with q ≥ 0. They are therefore soft: the penalty for 1 m³ of
     # violation is 10³·slack_weight times the value of delivering 1 m³ to that user, so violations never pay off.

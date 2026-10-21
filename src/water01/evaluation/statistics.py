@@ -61,7 +61,11 @@ def moving_block_bootstrap_ci(diff, groups=None, block=None, n_boot=None, alpha=
         res = np.concatenate(parts, axis=1)
         if calendar:
             ok = ~np.isnan(res)
-            stats = np.where(ok, res, 0.0).sum(axis=1) / np.maximum(ok.sum(axis=1), 1)
+            with np.errstate(invalid="ignore"):            # a replicate without an eligible day is left out
+                stats = np.where(ok, res, 0.0).sum(axis=1) / np.where(ok.any(axis=1), ok.sum(axis=1), np.nan)
+            stats = stats[~np.isnan(stats)]
+            if stats.size < 0.5 * n_boot:                  # too few eligible days for a calendar interval
+                return float(np.nanmean(d)) if np.isfinite(d).any() else np.nan, np.nan, np.nan
         else:
             stats = statistic(res, axis=1)
     lo, hi = np.quantile(stats, [alpha / 2, 1 - alpha / 2])
@@ -69,18 +73,24 @@ def moving_block_bootstrap_ci(diff, groups=None, block=None, n_boot=None, alpha=
 
 
 def season_signflip(diff, groups):
-    """Exact two-sided sign-flip (randomisation) test of the mean of the seasonal mean differences: the seasons are
-    the independent units, and under the null hypothesis each seasonal mean is symmetric about zero. NaN entries
-    (excluded days) are ignored. Returns (mean of seasonal means, p)."""
+    """Exact two-sided sign-flip (randomisation) test with the seasons as the units of inference. The statistic is
+    the mean of the daily differences, written as the mean of the seasonal mean differences weighted by the number
+    of eligible days of each season, so that it equals the reported estimate. Under the null hypothesis the seasonal
+    mean differences are independent and symmetric about zero, so that every one of the 2^n sign patterns is
+    equally likely. NaN entries (excluded days) are ignored. Returns (estimate, p)."""
     d = np.asarray(diff, float); g = np.asarray(groups)
-    m = np.array([np.nanmean(d[g == k]) for k in np.unique(g)])
-    m = m[~np.isnan(m)]
-    obs = abs(m.mean())
+    m, w = [], []
+    for k in np.unique(g):
+        x = d[g == k]; x = x[~np.isnan(x)]
+        if x.size:
+            m.append(x.mean()); w.append(x.size)
+    m, w = np.array(m), np.array(w, float) / np.sum(w)
+    est = float((w * m).sum())
     if np.all(m == 0.0):
         return 0.0, 1.0
     signs = np.array(np.meshgrid(*[[-1.0, 1.0]] * m.size)).reshape(m.size, -1).T
-    stats = np.abs((signs * m).mean(axis=1))
-    return float(m.mean()), float(np.mean(stats >= obs - 1e-15))
+    stats = np.abs((signs * (w * m)).sum(axis=1))
+    return est, float(np.mean(stats >= abs(est) - 1e-15))
 
 
 def wilcoxon_paired(diff):
@@ -107,6 +117,6 @@ def holm(pvalues):
 def sign_consistency(diff, groups, direction=+1):
     """Share of seasons whose mean difference has the expected sign (NaN entries are ignored)."""
     d = np.asarray(diff, float); g = np.asarray(groups)
-    keys = np.unique(g)
+    keys = [k for k in np.unique(g) if not np.isnan(d[g == k]).all()]   # seasons without an eligible day are left out
     ok = sum(1 for k in keys if np.sign(np.nanmean(d[g == k])) == direction)
-    return ok / keys.size
+    return ok / len(keys)

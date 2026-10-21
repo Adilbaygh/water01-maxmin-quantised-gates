@@ -99,7 +99,8 @@ def fig5(d):
     ax.scatter(x.p[early], x.i[early], s=11, facecolor="white", edgecolor=VERM, linewidths=0.8, marker="s",
                zorder=3, label="1–10 April")
     n0 = int(((x.p > 0.999) & (x.i < 0.01)).sum())
-    ax.annotate(f"{n0} days: R-1 demand\nbelow the actuator deadband", xy=(0.985, 0.02), xytext=(0.36, 0.16),
+    ax.annotate(f"{n0} days: " + r"$\lambda^{\mathrm{phys}}>0.999$," + "\n" + r"$\lambda^{\mathrm{IoT}}<0.01$",
+                xy=(0.985, 0.02), xytext=(0.36, 0.16),
                 fontsize=6.3, color=INK, arrowprops=dict(arrowstyle="-", color=MUTED, lw=0.6))
     ax.set_xlim(-0.02, 1.03); ax.set_ylim(-0.02, 1.03)
     ax.set_xlabel(r"$\lambda^{\mathrm{phys}}$ (daily)"); ax.set_ylabel(r"$\lambda^{\mathrm{IoT}}$ (daily)")
@@ -112,17 +113,25 @@ def fig5(d):
     s = pd.read_csv(os.path.join(ROOT, "results/tables/shapley_ratio_of_means.csv"))
     s = s[s.season != "all"].assign(year=lambda t: t.season.astype(int))
     yrs = s.year.to_numpy(); xi = np.arange(len(yrs)); w = 0.26
-    for k, (col, c, lab) in enumerate([("phi_quantisation", BLUE, r"$\phi_Q$ quantisation, deadband"),
-                                       ("phi_sensor", ORANGE, r"$\phi_S$ sensor"),
-                                       ("phi_communication", GREEN, r"$\phi_C$ communication")]):
-        ax.bar(xi + (k - 1) * w, s[col] * 100, width=w - 0.04, color=c, label=lab, linewidth=0)
+    e_zero = bool((s.phi_energy.abs() < 1e-12).all())
+    series = [("phi_quantisation", BLUE, r"$\phi_Q$ quantisation, deadband"),
+              ("phi_sensor", ORANGE, r"$\phi_S$ sensor"),
+              ("phi_communication", GREEN, r"$\phi_C$ communication")]
+    if not e_zero:
+        series.append(("phi_energy", MUTED, r"$\phi_E$ energy"))
+    w = 0.78 / len(series)
+    for k, (col, c, lab) in enumerate(series):
+        ax.bar(xi + (k - (len(series) - 1) / 2) * w, s[col] * 100, width=w - 0.04, color=c, label=lab, linewidth=0)
+    vals = np.concatenate([s[col].to_numpy() * 100 for col, _, _ in series])
     ax.axhline(0, color=INK, lw=0.6)
     ax.set_xticks(xi); ax.set_xticklabels([str(y)[2:] for y in yrs]); ax.set_xlabel("Season (20xx)")
     ax.set_ylabel(r"Shapley value, pp of $\Pi_1$ (ratio of means)")
-    ax.set_ylim(-1.5, 15)
+    lo, hi = min(vals.min(), 0.0), max(vals.max(), 0.0)
+    ax.set_ylim(lo - 0.1 * (hi - lo) - 0.5, hi + 0.35 * (hi - lo) + 0.5)    # room for the legend
     ax.legend(loc="upper left", fontsize=6.3, handlelength=1.0, borderaxespad=0.2)
-    ax.text(0.98, 0.70, "$\\phi_E$ = 0\nin every season", transform=ax.transAxes, ha="right", va="bottom",
-            fontsize=6.3, color=MUTED)
+    if e_zero:
+        ax.text(0.98, 0.70, "$\\phi_E$ = 0\nin every season", transform=ax.transAxes, ha="right", va="bottom",
+                fontsize=6.3, color=MUTED)
     grid(ax, "y"); panel(ax, "(b)", x=-0.14)
     # (c) satisfaction by user, IoT tuned
     ax = fig.add_subplot(gs[2])
@@ -175,7 +184,11 @@ def fig6():
         for yv, (name, r) in zip(ys, rows):
             for v, c, mk in zip(f(r), cols, mks):
                 ax.scatter([v], [yv], s=20, color=c, marker=mk, zorder=3, linewidths=0)
-        ax.set_xlim(*lim); ax.set_xlabel(xl); grid(ax); ax.tick_params(axis="y", length=0)
+        allv = np.array([v for _, r in rows for v in f(r)] + list(ref), float)
+        allv = allv[np.isfinite(allv)]
+        lo_, hi_ = min(lim[0], allv.min()), max(lim[1], allv.max())          # never clip a value
+        pad = 0.03 * (hi_ - lo_)
+        ax.set_xlim(lo_ - (pad if lo_ < lim[0] else 0), hi_ + (pad if hi_ > lim[1] else 0)); ax.set_xlabel(xl); grid(ax); ax.tick_params(axis="y", length=0)
         panel(ax, lab, x=-0.02 if lab != "(a)" else -0.02)
     axes[2].scatter([], [], s=20, color=VERM, marker="o", label="LXB − B0")
     axes[2].scatter([], [], s=20, color=ORANGE, marker="s", label="LXB − B3")

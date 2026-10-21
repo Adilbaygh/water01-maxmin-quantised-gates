@@ -9,7 +9,8 @@ Usage:
                                                                 # and compare it with the stored result
 Every parameter comes from configs/kegeyli_reference.yaml and configs/scenarios/<scenario>.yaml. Each job
 (method, year, tuned, iot) writes one CSV with a .meta.json (environment, configuration, code and input checksums).
-Existing files are skipped unless --force is given, so an interrupted sweep can be resumed.
+An existing result is kept only if its metadata show the current code and inputs and the table is complete;
+otherwise, and always with --force, it is recomputed, so an interrupted sweep can be resumed.
 Approximate time per season (183 days): B0, B1, B3 ≈ 2 min; B2, LXB, Oracle ≈ 8 min.
 
 Protocol: results/experiment/PREREGISTRATION.json holds the SHA-256 of requirements/hypotheses.md recorded when the
@@ -38,7 +39,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from water01.domain.passport import USERS  # noqa: E402
 from water01.optimization.lexlp import FALLBACKS, LEX_CHECK  # noqa: E402
 from water01.optimization.objectives import satisfaction  # noqa: E402
-from water01.simulation.provenance import config_inputs, relative_posix, sha256, write_metadata  # noqa: E402
+from water01.simulation.provenance import code_sha256, config_inputs, relative_posix, sha256, write_metadata  # noqa: E402
 from water01.simulation.runner import run_closed_loop_period  # noqa: E402
 from water01.simulation.scenarios import AVAILABLE_FACTORS, iot_scenario, load_config  # noqa: E402
 
@@ -85,6 +86,10 @@ EXPLORATORY = {
     "untuned_reverse": (("LXB", "B0", "B3", "B3V"), ("untuned",), ("phys", "iot")),   # reverse gate mismatch
     "final_share": (("LXB-F",), ("tuned", "untuned"), ("phys", "iot")),     # execution LP on the final daily share
     "b3v_deadband": (("B3V-DA",), ("tuned", "untuned"), ("iot",)),          # B3V with the pulse rule of LXB-DA
+    "gate_head_h0": (("LXB", "B0", "B1", "B3"), ("tuned",), ("phys", "iot")),  # gate law closer to Eq. (6) at zero head
+    "terminal_weight_low": (("LXB",), ("tuned", "untuned"), ("phys", "iot")),  # weak end-of-day level condition
+    "plant_substeps_4": [(("LXB", "B3"), ("tuned",), ("phys", "iot")),        # hydraulic step 225 s, command 15 min
+                         (("LXB-DA",), ("tuned",), ("iot",))],
     "dt_450": [(("LXB", "B3"), ("tuned",), ("phys", "iot")),                  # command step 7.5 min
                (("LXB-DA",), ("tuned",), ("iot",))],
 }
@@ -155,19 +160,44 @@ def run_job(method, year, tuned, iot, start=None, days=None, scenario="normal", 
     df["mass_error"] = res.mass_error
     df["messages"] = res.messages_sent; df["dropped"] = res.messages_dropped
     df["blocked"] = res.messages_blocked; df["lost"] = res.messages_lost   # dropped = blocked + lost
+    df["low_head_steps"] = res.low_head_steps; df["low_head_volume_m3"] = res.low_head_volume_m3
     df["lp_fallbacks"] = FALLBACKS["count"]                # solves that needed the HiGHS fallback path
     df["lex_violations"] = LEX_CHECK["violations"]          # solves in which a retained optimum was violated
     df["interlock_steps"] = res.interlock_steps; df["relief_steps"] = res.relief_steps
     df["battery_min_wh"] = res.battery_min_wh; df["radio_off_steps"] = res.radio_off_steps
     df["energy_used_wh"] = res.energy_used_wh; df["extra_substeps"] = res.extra_substeps
     path = out_dir / f"{method}_{year}_{tuned}_{iot}.csv"
-    df.to_csv(path, index=False)
+    tmp = path.with_name(path.name + ".part")
+    df.to_csv(tmp, index=False)
     path.with_suffix(".error.txt").unlink(missing_ok=True)   # error file left by an earlier attempt
     extra = runtime_inputs(cfg, iot, year)
     write_metadata(path, ROOT, config_inputs(cfg, ROOT) + DATA + extra,
                    {"method": method, "year": year, "tuned": tuned, "iot": iot, "start": start, "days": days,
                     "seed": cfg.seed + year}, cfg)
+    os.replace(tmp, path)                                   # the table appears only after its metadata
     return path.name, out["lambda"], time.time() - t0
+
+
+def is_current(path, days, code):
+    """True when a stored result can be kept on resumption: its metadata exist, were written by the current code
+    with the current checksums of every recorded input, and the table has one row per day."""
+    meta = path.with_name(path.name + ".meta.json")
+    if not (path.exists() and meta.exists()):
+        return False
+    try:
+        m = json.loads(meta.read_text(encoding="utf-8"))
+        if m.get("code_sha256") != code:
+            return False
+        for k, v in m.get("inputs", {}).items():
+            q = ROOT / k
+            if not q.exists() or sha256(q) != v:
+                return False
+        if days is not None and m.get("params", {}).get("days") != days:
+            return False
+        n = len(pd.read_csv(path, usecols=["date"]))
+        return n == m.get("params", {}).get("days")
+    except (OSError, ValueError, KeyError):
+        return False
 
 
 def _norm(key):
@@ -211,11 +241,16 @@ def compare_with_stored(new, stored):
     a = a.drop(columns=added)
     if a.shape != b.shape or list(a.columns) != list(b.columns):
         return {"shape": f"{a.shape} vs {b.shape}"}
-    num = a.select_dtypes("number").columns
+    num = [c for c in a.select_dtypes("number").columns if c in b.select_dtypes("number").columns]
+    nan_mismatch = {c: int((a[c].isna() != b[c].isna()).sum()) for c in num}
+    nan_mismatch = {c: n for c, n in nan_mismatch.items() if n}
     diff = (a[num] - b[num]).abs().max()
+    if nan_mismatch:                                   # a value that is missing in only one run is a difference
+        diff[list(nan_mismatch)] = np.inf
     same_text = all((a[c].astype(str) == b[c].astype(str)).all() for c in a.columns if c not in num)
     return {"max_abs_diff": float(diff.max()), "column": str(diff.idxmax()), "text_columns_equal": same_text,
-            "lambda_max_abs_diff": float(diff.get("lambda", np.nan)), "columns_added": ",".join(added)}
+            "lambda_max_abs_diff": float(diff.get("lambda", np.nan)), "columns_added": ",".join(added),
+            "nan_mismatch": ",".join(f"{c}:{n}" for c, n in nan_mismatch.items())}
 
 
 def parse_years(spec, cfg):
@@ -295,7 +330,12 @@ def main():
     for j in jobs:
         factors_of(j[3])
     if not (a.force or a.verify):
-        jobs = [j for j in jobs if not path(*j).exists()]
+        code = code_sha256(ROOT)
+        stale = [j for j in jobs if path(*j).exists() and not is_current(path(*j), a.days, code)]
+        jobs = [j for j in jobs if not is_current(path(*j), a.days, code)]
+        if stale:
+            print(f"{len(stale)} stored result(s) are incomplete or were computed with other code or inputs; "
+                  "they are recomputed.", flush=True)
     SLOW = ("LXB", "LXB-noS3", "LXB-DA", "LXB-F", "Oracle", "B2")    # slow methods first, for a more even load
     jobs.sort(key=lambda j: j[0] not in SLOW)
     print(f"Cases: {', '.join(dirs)}; jobs: {len(jobs)} (slow: {sum(j[0] in SLOW for j in jobs)}); "

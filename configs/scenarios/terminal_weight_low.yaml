@@ -1,0 +1,5 @@
+meta:
+  name: terminal_weight_low
+  description: "Exploratory: end-of-day level condition of the execution LP weighted 100 times less (0.1 instead of 10), so that refilling the pool is not charged to the common share"
+additions:
+  execution_terminal_weight: {value: 0.1, status: setting, source: "penalty per metre of terminal-level violation"}

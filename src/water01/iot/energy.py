@@ -62,6 +62,8 @@ def pv_energy_per_step(irradiance_hourly, dt_s, pv_peak_w=None, performance_rati
     pv_peak_w = value("pv_peak_w") if pv_peak_w is None else pv_peak_w
     pr = value("pv_performance_ratio") if performance_ratio is None else performance_ratio
     per_hour = int(round(3600.0 / dt_s))
+    if abs(per_hour * dt_s - 3600.0) > 1e-9:
+        raise ValueError("the control step must divide one hour (hourly irradiance)")
     g = np.repeat(np.asarray(irradiance_hourly, float).ravel(), per_hour)       # W m⁻² (hourly mean)
     return pv_peak_w * g / 1000.0 * pr * dt_s / 3600.0
 
@@ -104,6 +106,7 @@ class EnergyNode:
     def advance(self, k, messages):
         """Energy balance of step k; messages: number of radio messages sent/received at this step.
         Returns whether the radio is on at the next step."""
+        self.radio_off_steps += int(not self.radio_on)          # state of the radio during this step
         load = (self.rtu_w + (self.gateway_w if self.radio_on else 0.0)) * self.dt_s / 3600.0
         msg = self.message_wh * messages
         self.used_wh += load + msg
@@ -114,5 +117,4 @@ class EnergyNode:
             self.radio_on = False
         elif not self.radio_on and self.state.wh >= self.resume_wh:
             self.radio_on = True
-        self.radio_off_steps += int(not self.radio_on)
         return self.radio_on

@@ -1,0 +1,5 @@
+meta:
+  name: plant_substeps_4
+  description: "Verification: four hydraulic steps of 225 s per 15-min control step (command interval unchanged)"
+overrides:
+  plant_substeps: {value: 4, status: setting, source: "convergence of the closed loop with respect to the hydraulic step (Table S2b)"}

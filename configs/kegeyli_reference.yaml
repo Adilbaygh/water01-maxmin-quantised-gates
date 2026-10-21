@@ -33,8 +33,8 @@ canal:                       # Section 2.1, Table 1
 
 id_model:                    # Section 2.4, Equation (8)
   A_s_m2: {value: 549000.0, status: derived, source: "T(H_norm) x L, actual geometry (upper bound)"}
-  A_s_identified_m2: {value: 371000.0, status: derived, source: "SV step response at H_norm, dQ=±1 m3/s (scripts/identify_id_model.py)"}
-  tau_identified_s: {value: 1530.0, status: derived, source: "same identification; d = ceil(tau/dt)"}
+  A_s_identified_m2: {value: 391000.0, status: derived, source: "SV step response at H_norm with conveyance losses eta, dQ=±1 m3/s applied at the step start, mean of both signs (scripts/identify_id_model.py)"}
+  tau_identified_s: {value: 1380.0, status: derived, source: "same identification; d = ceil(tau/dt)"}
   id_step_dq_m3s: {value: 1.0, status: setting, source: "identification protocol: inflow step ±dQ at Q_c"}
   id_duration_h: {value: 6, status: setting, source: "identification protocol: response duration"}
   id_fit_fraction: {value: 0.5, status: setting, source: "identification protocol: line fitted to the last half"}
@@ -63,6 +63,10 @@ numerics:                    # numerical settings
   newton_max_iter: {value: 30, status: setting, source: ""}
   jacobian_fd_step: {value: 1.0e-7, status: setting, source: "relative finite-difference step"}
   gate_head_regularisation_m: {value: 1.0e-3, status: setting, source: "softplus scale of sqrt(head+): smooth at zero head (Newton)"}
+  plant_substeps: {value: 1, status: setting, source: "hydraulic steps per control step; pulse and closed-loop convergence with 1-8 steps (Table S2b)"}
+  gate_change_at_step_start: {value: true, status: setting, source: "gates and daily supply change at the start of a control step (piecewise-constant commands)"}
+  gate_change_first_theta: {value: 1.0, status: setting, source: "fully implicit first hydraulic step after a gate change (damps the alternating mode of the theta scheme)"}
+  ledger_constant_openings: {value: true, status: setting, source: "controller volume reconstruction with the openings held over the step"}
   lp_primal_feasibility_tolerance: {value: 1.0e-9, status: setting, source: "HiGHS; default 1e-7 made secondary terms invisible"}
   lp_dual_feasibility_tolerance: {value: 1.0e-9, status: setting, source: "HiGHS"}
 

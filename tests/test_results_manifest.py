@@ -96,3 +96,42 @@ def test_stored_results_match_manifest():
     assert errors == []
     assert {n for n in hashes if n.endswith(".csv")} == {n for n in files if n.endswith(".csv")}
     assert all(hashes[n] == h for n, h in files.items())
+
+
+def test_runs_of_other_code_or_inputs_are_rejected_unless_listed():
+    code = C.code_sha256(C.ROOT)
+    ref = "configs/kegeyli_reference.yaml"
+    now = C.sha256(C.ROOT / ref)
+    assert C.currency({"code_sha256": {code: ["a"]}, ref: {now: ["a"]}, "DATA/processed/x.csv": {"s": ["a"]}}) == []
+    errors = C.currency({"code_sha256": {code: ["a"], "old": ["b"]}, ref: {"old": ["b"]}})
+    assert len(errors) == 2 and "not with the current code" in errors[0] and ref in errors[1]
+
+
+def test_resumption_keeps_only_complete_current_results(tmp_path):
+    import run_experiment as R
+    code = R.code_sha256(R.ROOT)
+    ref = "configs/kegeyli_reference.yaml"
+    path = tmp_path / "LXB_2010_tuned_phys.csv"
+    pd.DataFrame({"date": pd.date_range("2010-04-01", periods=183).date}).to_csv(path, index=False)
+    meta = path.with_name(path.name + ".meta.json")
+    good = {"code_sha256": code, "inputs": {ref: R.sha256(R.ROOT / ref)}, "params": {"days": 183}}
+    meta.write_text(json.dumps(good)); assert R.is_current(path, None, code)
+    meta.write_text(json.dumps({**good, "code_sha256": "old"})); assert not R.is_current(path, None, code)
+    meta.write_text(json.dumps({**good, "inputs": {ref: "old"}})); assert not R.is_current(path, None, code)
+    meta.write_text(json.dumps({**good, "params": {"days": 184}})); assert not R.is_current(path, None, code)
+    meta.unlink(); assert not R.is_current(path, None, code)
+
+
+def test_numerically_invalid_rows_are_reported():
+    df = pd.DataFrame({"lambda": [0.5, np.nan], "r_A": [0.6, 0.7], "V_A": [1.0, -2.0], "mass_error": [0.5, 0.0],
+                       "lex_violations": [0, 7], "messages": [1, 1], "dropped": [8, 8], "blocked": [0, 0],
+                       "lost": [8, 8]})
+    errors = []
+    C.values(df, "x.csv", errors)
+    assert any("not finite" in e for e in errors)
+    df.loc[1, "lambda"] = 0.9
+    errors = []
+    C.values(df, "x.csv", errors)
+    text = "\n".join(errors)
+    for msg in ("exceeds the smallest", "negative delivered", "mass error", "retained optimum", "more packets lost"):
+        assert msg in text

@@ -7,10 +7,10 @@ Checks (every violation is listed):
   2. every file has 183 rows with consecutive dates from 1 April to 30 September and unique (year, date); the method,
      year, tuned and iot columns match the file name;
   3. energy columns: battery_min_wh is filled when factor E is active and empty otherwise; radio_off_steps >= 0;
-  4. every run used the same input files (checksums in .meta.json); the runs of one folder used the same source
-     code, and every code version is listed in results/versions.json, which also lists accepted revisions of the
-     reference configuration (a later version must reproduce the stored runs of an earlier one, see
-     results/verification/); the protocol checksum of requirements/hypotheses.md
+  4. every run used the current source code and the current version of every recorded input file present in the
+     working tree (checksums in .meta.json); inputs that are not distributed must agree between runs; with
+     --accept-listed, earlier versions listed in results/versions.json are accepted instead (a later version must
+     reproduce the stored runs of an earlier one, see results/verification/); the protocol checksum of requirements/hypotheses.md
      equals the frozen value in PREREGISTRATION.json;
   5. --write records MANIFEST_<scenario>.json with the checksum of every result file and its .meta.json; without --write the manifest must
      exist and every file must still match it.
@@ -25,11 +25,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src")); sys.path.insert(0, str(ROOT / "scripts"))
-from water01.simulation.provenance import sha256  # noqa: E402
+from water01.simulation.provenance import code_sha256, sha256  # noqa: E402
 
 METHODS = ("B0", "B1", "B2", "B3", "LXB", "Oracle")
 SUBSETS = ("S", "Q", "C", "E", "SQ", "SC", "SE", "QC", "QE", "CE", "SQC", "SQE", "SCE", "QCE")
@@ -91,6 +92,44 @@ def check_file(path, run, errors):
             errors.append(f"{path.name}: energy factor inactive but battery_min_wh filled")
     if "radio_off_steps" in df and (df.radio_off_steps.fillna(0) < 0).any():
         errors.append(f"{path.name}: negative radio_off_steps")
+    values(df, path.name, errors)
+
+
+def values(df, name, errors, mass_tol=1e-3):
+    """Numerical acceptance of one result table: λ and r_j finite and in [0, 1] (λ ≤ min r_j up to round-off),
+    delivered volumes non-negative, mass error within the configured relative tolerance (mass_balance_relative_
+    tolerance), no violated retained optimum, consistent packet counters, non-negative step counters."""
+    def bad(msg):
+        errors.append(f"{name}: {msg}")
+    if "lambda" not in df or not np.isfinite(df["lambda"]).all():
+        bad("lambda missing or not finite"); return
+    if ((df["lambda"] < -1e-9) | (df["lambda"] > 1 + 1e-9)).any():
+        bad("lambda outside [0, 1]")
+    rc = [c for c in df if c.startswith("r_")]
+    if rc:
+        r = df[rc].to_numpy(float)                       # NaN: pair without demand (outside A+)
+        if np.isinf(r).any() or (r < -1e-9).any() or (r > 1 + 1e-6).any():
+            bad("satisfaction r_j infinite or outside [0, 1]")
+        else:
+            has = ~np.isnan(r).all(axis=1)
+            rmin = np.nanmin(np.where(has[:, None], r, 0.0), axis=1)
+            if (df["lambda"].to_numpy()[has] > rmin[has] + 1e-9).any():
+                bad("lambda exceeds the smallest r_j")
+    vc = [c for c in df if c.startswith("V_")]
+    if vc and (df[vc].to_numpy(float) < -1e-6).any():
+        bad("negative delivered volume")
+    if "mass_error" in df and not (np.abs(df.mass_error.to_numpy(float)) <= mass_tol).all():
+        bad(f"mass error above {mass_tol}")
+    if "lex_violations" in df and (df.lex_violations.fillna(0) > 0).any():
+        bad("retained optimum violated in an LP solve (lex_violations > 0)")
+    if {"dropped", "blocked", "lost"} <= set(df) and (df.dropped != df.blocked + df.lost).any():
+        bad("dropped differs from blocked + lost")
+    if {"lost", "messages"} <= set(df) and (df.lost > df.messages).any():
+        bad("more packets lost than transmitted")
+    for c in ("messages", "dropped", "blocked", "lost", "lp_fallbacks", "interlock_steps", "relief_steps",
+              "extra_substeps", "low_head_steps", "low_head_volume_m3"):
+        if c in df and (df[c].fillna(0) < 0).any():
+            bad(f"negative {c}")
 
 
 def validate(folder, runs, prereg=None, seen=None):
@@ -115,7 +154,9 @@ def validate(folder, runs, prereg=None, seen=None):
             errors.append(f"{rel}/{n}: .meta.json missing"); continue
         hashes[n + ".meta.json"] = sha256(meta)
         m = json.loads(meta.read_text(encoding="utf-8"))
-        items = {_norm(k): v for k, v in m.get("inputs", {}).items() if not _norm(k).startswith("configs/scenarios/")}
+        if not m.get("inputs"):
+            errors.append(f"{rel}/{n}: no input checksums in .meta.json")
+        items = {_norm(k): v for k, v in m.get("inputs", {}).items()}
         for k, v in items.items():
             seen.setdefault(k, {}).setdefault(v, []).append(f"{rel}/{n}")
         code = m.get("code_sha256", "not recorded")
@@ -153,11 +194,35 @@ def consistency(seen):
     return errors
 
 
+def currency(seen):
+    """Every run must have been computed with the current code and with the current version of every recorded input
+    that is present in the working tree (inputs that are not distributed, such as operating records, are compared
+    between runs only)."""
+    errors, code = [], code_sha256(ROOT)
+    for h, f in seen.get("code_sha256", {}).items():
+        if h != code:
+            errors.append(f"{len(f)} run(s) computed with code {h[:12]}, not with the current code {code[:12]} "
+                          f"(e.g. {f[0]})")
+    for k, by_hash in seen.items():
+        q = ROOT / k
+        if k == "code_sha256" or not q.is_file():
+            continue
+        now = sha256(q)
+        for h, f in by_hash.items():
+            if h != now:
+                errors.append(f"{k}: {len(f)} run(s) used checksum {h[:8]}, the current file has {now[:8]} "
+                              f"(e.g. {f[0]})")
+    return errors
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scenario", default="normal")
     ap.add_argument("--all", action="store_true", help="also check the sensitivity and exploratory folders")
     ap.add_argument("--write", action="store_true", help="write the manifest if every check passes")
+    ap.add_argument("--accept-listed", action="store_true",
+                    help="accept runs of earlier code or input versions listed in results/versions.json instead of "
+                         "requiring the current code and inputs")
     a = ap.parse_args()
     exp = ROOT / "results/experiment"
     reg = exp / "PREREGISTRATION.json"
@@ -172,7 +237,7 @@ def main():
         e, h = validate(ROOT / rel, runs, prereg, seen)
         errors += e
         hashes.update({f"{rel}/{n}": v for n, v in h.items()})
-    errors += consistency(seen)
+    errors += consistency(seen) if a.accept_listed else currency(seen)
     man_path = exp / (f"MANIFEST_{a.scenario}.json" if not a.all else "MANIFEST_all.json")
     if not a.write:
         if not man_path.exists():
@@ -190,7 +255,9 @@ def main():
         sys.exit(1)
     codes = {h: len(f) for h, f in seen.get("code_sha256", {"n/a": []}).items()}
     code = next(iter(codes)) if len(codes) == 1 else sorted(codes)
-    print(f"OK: {len(hashes)} runs in {len(folders)} folder(s), complete, with identical inputs; code_sha256 "
+    n_runs = sum(1 for n in hashes if n.endswith(".csv"))
+    print(f"OK: {n_runs} runs ({len(hashes)} files with their .meta.json) in {len(folders)} folder(s), complete, "
+          "with identical inputs; code_sha256 "
           + ", ".join(f"{h[:12]} ({n} runs)" for h, n in codes.items()) + ".")
     if a.write:
         man = {"folders": sorted(folders), "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),

@@ -75,6 +75,27 @@ def code_sha256(root):
     return h.hexdigest()
 
 
+def all_code_sha256(root):
+    """Checksum of the whole code base (src/**/*.py and scripts/*.py), for derived artefacts (evaluations, tables),
+    whose evaluator is not covered by code_sha256."""
+    root = Path(root); h = hashlib.sha256()
+    files = list((root / "src").rglob("*.py")) + list((root / "scripts").glob("*.py"))
+    for p in sorted(files, key=lambda q: q.relative_to(root).as_posix()):
+        h.update(p.relative_to(root).as_posix().encode() + b"\0")
+        h.update(p.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    return h.hexdigest()
+
+
+def files_sha256(paths, root):
+    """One checksum over the relative paths and contents of the given files (input manifest of a derived artefact).
+    Returns (checksum, number of files)."""
+    root = Path(root); h = hashlib.sha256(); n = 0
+    for p in sorted((Path(q) for q in paths), key=lambda q: q.resolve().relative_to(root.resolve()).as_posix()):
+        h.update(p.resolve().relative_to(root.resolve()).as_posix().encode() + b"\0")
+        h.update(sha256(p).encode() + b"\0"); n += 1
+    return h.hexdigest(), n
+
+
 def relative_posix(path, root):
     return Path(path).resolve().relative_to(Path(root).resolve()).as_posix()
 

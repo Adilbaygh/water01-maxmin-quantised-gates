@@ -25,6 +25,8 @@ class ControllerModel:
     epsilon_1: float               # fairness tolerances (configuration: fairness)
     epsilon_2: float
     pulse_flow: object = None      # h ↦ [6] discharge at the smallest executable opening (LXB-DA)
+    max_flows: object = None       # h ↦ [6] discharge with fully open gates (controller's node model): exact (9) at
+                                   # the known current level for the first action
 
     def daily_capacity(self, steps_per_day):
         return self.capacity * steps_per_day * self.dt

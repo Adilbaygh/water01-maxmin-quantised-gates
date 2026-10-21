@@ -20,6 +20,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,9 +84,14 @@ def main():
         ph = series(df, "LXB", tuned, "phys", "lambda")
         p_lx, p_da = (aligned(ph, series(df, m, tuned, "iot", "lambda")) for m in ("LXB", "LXB-DA"))
         ok = (p_lx[0] > 0).to_numpy()
-        pi_lx = ((p_lx[0] - p_lx[1]) / p_lx[0]).to_numpy()[ok]
-        pi_da = ((p_da[0] - p_da[1]) / p_da[0]).to_numpy()[ok]
-        run_family(rows, "E3", "Π1(LXB-DA) − Π1(", f"{tuned}/iot", {"LXB)": pi_da - pi_lx}, p_lx[2][ok],
+        with np.errstate(divide="ignore", invalid="ignore"):
+            pi_lx = ((p_lx[0] - p_lx[1]) / p_lx[0]).to_numpy()
+            pi_da = ((p_da[0] - p_da[1]) / p_da[0]).to_numpy()
+        if EH.SCHEME == "calendar":             # excluded days stay in the calendar as NaN (not joined by blocks)
+            d3, y3 = np.where(ok, pi_da - pi_lx, np.nan), np.asarray(p_lx[2])
+        else:
+            d3, y3 = (pi_da - pi_lx)[ok], np.asarray(p_lx[2])[ok]
+        run_family(rows, "E3", "Π1(LXB-DA) − Π1(", f"{tuned}/iot", {"LXB)": d3}, y3,
                    "decrease", seed, role="exploratory", note=f"days with λ_phys = 0 excluded: {int((~ok).sum())}")
     d, yrs = lam_diff(df, "B3V", "LXB", "tuned", "iot")                             # E4
     run_family(rows, "E4", "B3V − ", "tuned/iot", {"LXB": d}, yrs, "increase", seed, role="exploratory",

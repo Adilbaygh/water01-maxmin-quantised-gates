@@ -105,6 +105,7 @@ class IntradayExecutor:
         sol = solve_intraday(state.inflow_history, q_future, state.level, remaining, next_rate, n_today, K, m.dt,
                              m.eta, m.A_s, m.d, m.chords, m.capacity, m.h_lo, m.h_hi, m.h_ref, self.q_prev,
                              m.dq_max, durations=tau, objective=self.objective, weights=weights,
+                             first_limit=None if m.max_flows is None else m.max_flows(state.level),
                              **({} if self.share == "remaining" else
                                 dict(share=self.share, delivered_today=np.asarray(state.delivered_today, float),
                                      target_today=np.asarray(target, float))))
@@ -189,4 +190,6 @@ class LXBDeadbandAwareController(LXBController):
         remaining = np.maximum(self.target - np.asarray(state.delivered_today, float), 0.0)
         q, pulses = pulse_adjust(cmd.flows, m.pulse_flow(state.level), remaining, m.dt, self.target)
         info = dict(cmd.info); info["pulses"] = pulses
-        return Command(flows=np.minimum(q, m.capacity), target=cmd.target, info=info)
+        q = np.minimum(q, m.capacity)
+        self.exec.q_prev = q                   # the next LP measures rate and movement from the commanded discharge
+        return Command(flows=q, target=cmd.target, info=info)

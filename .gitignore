@@ -18,14 +18,22 @@
 /requirements/*
 !/requirements/hypotheses.md
 !/requirements/hypotheses_en.md
+!/requirements/protocol_record_en.md
 
-# Input data: the operating records of the irrigation system are third-party data (available to reviewers on
-# request); only the open NASA POWER files and the synthetic inputs are public
+# Input data: the processed operating records used by the model, the open NASA POWER files and the synthetic inputs
+# are public; the original record sheets, maps and working notes stay local
 /DATA/*
 !/DATA/raw/
 /DATA/raw/*
 !/DATA/raw/nasa_power/
 !/DATA/synthetic/
+!/DATA/processed/
+/DATA/processed/*
+!/DATA/processed/README.md
+!/DATA/processed/rashod_2010_2019_daily.csv
+!/DATA/processed/demand_decadal.csv
+!/DATA/processed/limit_2021_kegeyli_decadal.csv
+!/DATA/processed/dispatcher_2020_kegeyli.csv
 
 # Scripts that build the manuscript or prepare private material
 /scripts/build_methods_docx.py
@@ -34,9 +42,12 @@
 /scripts/schema_offtakes.py
 /scripts/make_review_archive.py
 
-# Run artefacts
+# Run artefacts: error files, interrupted writes, short check runs and archived summaries of earlier evaluations
 *.error.txt
+*.part
 /results/verification/rerun/normal/*.tmp
+/results/experiment_check/
+/results/superseded/
 
 # Python, tests and environments
 __pycache__/

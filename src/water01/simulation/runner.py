@@ -63,13 +63,30 @@ def build_controller_model(node_model, cfg, dt=None):
     h_ref, dh = value("H_norm_m"), 1e-3
     f_ref = node_model.max_flows(h_ref)
     slope = (node_model.max_flows(h_ref + dh) - node_model.max_flows(h_ref - dh)) / (2 * dh)
-    chord_set = [command_limit(bp, f[:, j], h_ref, f_ref[j], slope[j]) for j in range(6)]
+    chord_set = []
+    for j in range(6):
+        if j < 5:
+            # regulators: the discharge vanishes at the tail-water level, so the chords start there (value 0); the
+            # breakpoints below it and within 5 cm above it are dropped. The interpolant is then conservative from the
+            # tail-water level upwards, and below it the first chord is negative (no command is feasible without slack)
+            tw = node_model.tailwater_m[j]
+            bj = np.r_[tw, bp[bp > tw + 0.05]]
+            fj = np.r_[0.0, f[bp > tw + 0.05, j]]
+            chord_set.append(command_limit(bj, fj, h_ref, f_ref[j], slope[j]))
+            grid = np.linspace(tw, bj[-1], 401)
+            lim = np.min(chord_set[-1][0][:, None] + chord_set[-1][1][:, None] * grid[None, :], axis=0)
+            true = np.array([node_model.max_flows(x)[j] for x in grid])
+            if np.any(lim > true + 1e-9):
+                raise ValueError(f"command constraint (9) of outlet {j + 1} is not conservative")
+        else:
+            chord_set.append(command_limit(bp, f[:, j], h_ref, f_ref[j], slope[j]))
     cap = np.array(value("outlet_capacity_m3s"), float)
     return ControllerModel(
         dt=dt, eta=value("eta"), A_s=value("A_s_identified_m2"),
         d=math.ceil(value("tau_identified_s") / dt - 1e-12), chords=chord_set, capacity=cap,
         h_lo=cfg.h_min_operating_m, h_hi=value("H_max_m") - cfg.freeboard_m, h_ref=value("H_norm_m"),
-        dq_max=value("gate_rate_fraction_per_step") * cap, epsilon_1=cfg.epsilon_1, epsilon_2=cfg.epsilon_2)
+        dq_max=value("gate_rate_fraction_per_step") * cap, epsilon_1=cfg.epsilon_1, epsilon_2=cfg.epsilon_2,
+        max_flows=node_model.max_flows)
 
 
 def pulse_flow_for(node_model, iot):
@@ -138,7 +155,8 @@ def run_closed_loop_period(method, supply_csv, demand_csv, cfg, start, days, tun
     if iot is not None and iot.energy:                         # (16): NASA POWER hourly irradiance -> PV energy
         from ..iot.energy import load_nasa_power, pv_energy_per_step
         pv = pv_energy_per_step(load_nasa_power(dates), dt)
-    res = run_closed_loop(ctrl, reach or Reach(), node_true, node_model, model, horizon, Demand(D), S, A_lim,
+    demand = Demand(D, np.asarray(value("weights"), float))   # configured user weights w_j
+    res = run_closed_loop(ctrl, reach or Reach(), node_true, node_model, model, horizon, demand, S, A_lim,
                           eta_true, value("h_init_m") if h_init is None else h_init, iot, seed,
                           cfg.preissmann_theta, progress, pv)
     met = compute(res.delivered, D)

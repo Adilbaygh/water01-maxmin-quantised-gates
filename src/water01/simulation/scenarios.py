@@ -40,7 +40,9 @@ def load_supply(path, vegetation_months=(4, 5, 6, 7, 8, 9), blank_policy=None):
     df = pd.read_csv(path, parse_dates=["date"])
     if "kegeyli_Q" not in df:
         raise ValueError("Column kegeyli_Q is missing")
-    df = df[df.date.dt.month.isin(vegetation_months)].copy()
+    df = df[df.date.dt.month.isin(vegetation_months)].sort_values("date").reset_index(drop=True)
+    if df.date.duplicated().any():
+        raise ValueError("Duplicate dates in the supply record")
     df["supply_blank_assumed_zero"] = df.kegeyli_Q.isna()
     if blank_policy == "zero":
         df["S_m3s"] = df.kegeyli_Q.fillna(0.0)

@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..control.interface import ControlState, Supply
-from ..domain.passport import value
+from ..domain.passport import optional, value
 from ..domain.state import DeliveryLedger
 from ..hydraulics.preissmann import PreissmannSolver
 from ..hydraulics.saint_venant import inflow_bc, outflow_bc, steady_profile
@@ -52,13 +52,16 @@ def simulate(solver, duration_s, before_step=None):
             "mass_error": float(mass_error)}
 
 
-def step_response(reach, Q0, h_down, dQ, duration_s, dt_s, eta=1.0, theta=None):
-    """ID model identification protocol (Section 2.4): steady profile at Q0, constant downstream outflow (Q0·η),
-    inflow changed by dQ at t = 0. Returns: the result of simulate()."""
+def step_response(reach, Q0, h_down, dQ, duration_s, dt_s, eta=1.0, theta=None, step_start=True):
+    """ID model identification protocol (Section 2.4): steady profile at Q0 with conveyance losses η, constant
+    downstream outflow (Q0·η), inflow changed by dQ at t = 0. With step_start, the inflow changes at the start of
+    the first step, as in the closed loop (gate_change_at_step_start). Returns: the result of simulate()."""
     h0, Qp = steady_profile(reach, Q0, h_down, eta=eta)
     q_out = float(Qp[-1])
     s = PreissmannSolver(reach, dt_s, h0, Qp, inflow_bc(lambda t: Q0 + dQ), outflow_bc(lambda t, hN: q_out),
                          theta=theta, eta=eta)
+    if step_start:
+        s.Q[0] = Q0 + dQ
     return simulate(s, duration_s)
 
 
@@ -78,7 +81,8 @@ class IoTConfig:
 
     @property
     def ideal(self):
-        return (self.sensor_accuracy_m == 0 and self.sensor_bias_m == 0 and self.gate_resolution is None and self.message_budget is None
+        return (self.sensor_accuracy_m == 0 and self.sensor_bias_m == 0 and not self.sensor_resolution_m
+                and self.gate_resolution is None and not self.gate_deadband and self.message_budget is None
                 and self.loss_probability == 0 and not self.energy)
 
 
@@ -101,6 +105,8 @@ class ClosedLoopResult:
     energy_used_wh: float = 0.0             # IoT node consumption (RTU + gateway + messages)
     messages_blocked: int = 0               # command packets not sent because the window budget was exhausted
     messages_lost: int = 0                  # command packets sent but lost on the channel
+    low_head_steps: int = 0                 # steps with an open regulator whose head falls below 10 h0 (smoothed gate law)
+    low_head_volume_m3: float = 0.0         # volume delivered by such regulators in such steps
 
 
 def command_to_openings(cmd, node_model, h_est, current):
@@ -136,8 +142,11 @@ class CanalPlant:
         self.ramp_s = 3600.0 * value("supply_ramp_hours")       # 0: step change at the start of the day (base case)
         self.solver = PreissmannSolver(reach, dt, self.h0, self.Q0, inflow_bc(self.inflow),
                                        outflow_bc(lambda t, hN: node.outflow(hN, self.openings[:5], self.openings[5])),
-                                       theta=theta, eta=eta)
+                                       theta=theta, eta=eta, substeps=optional("plant_substeps", 1))
         self.delivered = DeliveryLedger(6, self.P)
+        self.gate_jump = bool(optional("gate_change_at_step_start", False))
+        self.jump_theta = optional("gate_change_first_theta", None)    # time weight of the step after a gate change
+        self.h0_gate = value("gate_head_regularisation_m"); self.low_head_steps = 0; self.low_head_volume = 0.0
         self.V0 = reach.volume(self.solver.h); self.net = 0.0; self.substeps = 0
         self.k = 0
 
@@ -167,6 +176,8 @@ class CanalPlant:
             a[5] = executable(a)[5]
         self.openings = a
         self._flows_old = self.node.flows(self.solver.h[-1], a)
+        # the solver's outflow equals the node outflow of the executed (quantised) openings
+        self.solver.Q[-1] = self.node.outflow(float(self.solver.h[-1]), a[:5], a[5])
         return a
 
     @property
@@ -184,7 +195,7 @@ class CanalPlant:
         u = self.rng.uniform(-1.0, 1.0)        # drawn at every step, whether or not the sensor error is active
         z = (measure(h, self.sensor_accuracy_m, resolution_m=self.sensor_resolution_m, unit_noise=u,
                      bias_m=self.sensor_bias_m)
-             if self.sensor_accuracy_m > 0 or self.sensor_bias_m != 0 else h)
+             if self.sensor_accuracy_m > 0 or self.sensor_bias_m != 0 or self.sensor_resolution_m else h)
         return Observation(t=self.solver.t, day=self.day, step=self.step_in_day, level=z,
                            inflow=float(self.S[min(self.day, self.P - 1)]), openings=self.openings.copy())
 
@@ -195,16 +206,35 @@ class CanalPlant:
         """One Δt with the given actuator positions (Preissmann θ-weighted true delivery and mass balance)."""
         if not np.isclose(dt, self.dt):
             raise ValueError("The plant step must equal Δt")
-        self.openings = np.array(openings, float)
+        new_openings = np.array(openings, float)
+        if self.gate_jump:                                       # the daily supply also changes at the step start
+            self.solver.Q[0] = self.inflow(self.solver.t + 1e-6)
+        if self.gate_jump and not np.array_equal(new_openings, self.openings):
+            # the gates move at the start of the step: the node outflow at the old time level and the volume ledger
+            # start from the discharge of the new openings at the current level (instantaneous gate change)
+            hN = float(self.solver.h[-1])
+            self.solver.Q[-1] = self.node.outflow(hN, new_openings[:5], new_openings[5])
+            self._flows_old = self.node.flows(hN, new_openings)
+            self.solver.first_theta = self.jump_theta
+        self.openings = new_openings
+        h_start = float(self.solver.h[-1])
         self.solver.step()
         self.net += self.solver.last_net_inflow
         vol = np.zeros(6)
-        for dt_i, hN in self.solver.last_substeps:              # θ-weighted volume over the substeps
+        for dt_i, hN, th in self.solver.last_substeps:          # θ-weighted volume over the substeps
             flows_new = self.node.flows(hN, self.openings)
-            vol += dt_i * (self.theta * flows_new + (1 - self.theta) * self._flows_old)
+            vol += dt_i * (th * flows_new + (1 - th) * self._flows_old)
             self._flows_old = flows_new
         self.delivered.add(self.day, vol / dt, dt)
-        self.substeps += self.solver.substeps - 1
+        # exposure to the smoothed part of the gate law: open regulators with a head below 10 h0 at the start of the
+        # step or at the end of any hydraulic substep
+        h_min = min([h_start] + [p[1] for p in self.solver.last_substeps])
+        head = h_min - np.asarray(self.node.tailwater_m, float)
+        low = (self.openings[:5] > 0) & (head < 10.0 * self.h0_gate)
+        if low.any():
+            self.low_head_steps += 1
+            self.low_head_volume += float(vol[:5][low].sum())
+        self.substeps += int(self.solver.substeps > self.solver.base_substeps)   # Newton fallbacks only
         self.k += 1
         return self._flows_old
 
@@ -234,6 +264,9 @@ class StateEstimator:
         self.ledger = DeliveryLedger(6, P)
         self.h = float(h0); self.hist = [inflow0] * constraints.d
         self._old = None
+        # True: the gates hold the new openings over the whole step, so the reconstructed flow at the start of the
+        # step is evaluated with the new openings at the previous level estimate (False: previous openings)
+        self.constant_openings = bool(optional("ledger_constant_openings", False))
 
     def start(self, openings):
         self._old = self.node.flows(self.h, openings)
@@ -249,6 +282,7 @@ class StateEstimator:
     def update(self, obs_after, inflow_used):
         """Updates the estimate with the post-step measurement and reconstructs the delivery."""
         m = self.m
+        h_prev = self.h
         if self.iot.sensor_accuracy_m > 0 or self.iot.sensor_bias_m != 0 or obs_after.level is None:  # None: no radio
             q_rec = self.node.flows(self.h, obs_after.openings)
             pred = id_step(self.h, self.hist[0] if m.d > 0 else inflow_used, q_rec[:5], q_rec[5], m.A_s, m.dt, m.eta)
@@ -256,8 +290,9 @@ class StateEstimator:
         else:
             self.h = float(obs_after.level)
         new = self.node.flows(self.h, obs_after.openings)
+        old = self.node.flows(h_prev, obs_after.openings) if self.constant_openings else self._old
         self.ledger.add(obs_after.day if obs_after.step > 0 else obs_after.day - 1,
-                        self.theta * new + (1 - self.theta) * self._old, m.dt)
+                        self.theta * new + (1 - self.theta) * old, m.dt)
         self._old = new
         if m.d > 0:
             self.hist = (self.hist + [inflow_used])[-m.d:]
@@ -305,7 +340,11 @@ class Actuator:
     def executable(self, openings, previous):
         """Openings that the actuator realises from `previous` (quantisation and deadband, Equation (14))."""
         if self.iot.gate_resolution is None:
-            return np.array(openings, float)
+            a = np.array(openings, float)
+            if self.iot.gate_deadband:                          # deadband without quantisation (closure always executed)
+                keep = (np.abs(a - previous) < self.iot.gate_deadband * self.node.max_opening - 1e-12) & (a > 0)
+                a[keep] = np.asarray(previous, float)[keep]
+            return a
         frac = [quantize(a / amax, self.iot.gate_resolution, prev / amax, self.iot.gate_deadband)
                 for a, amax, prev in zip(openings, self.node.max_opening, previous)]
         return np.array(frac) * self.node.max_opening
@@ -316,7 +355,8 @@ class Actuator:
         a_req, lost = command_to_openings(command, self.node, level, self.position)
         self.lost_steps += lost; self.last_lost = lost
         a_req = self.executable(a_req, self.position)
-        changed = (not np.allclose(a_req, self.position) if self.iot.gate_resolution is not None
+        changed = (not np.allclose(a_req, self.position)
+                   if self.iot.gate_resolution is not None or self.iot.gate_deadband
                    else not np.array_equal(a_req, self.position))
         if changed:                                             # a packet is sent only when an opening changes
             self.tx_steps += 1
@@ -414,6 +454,7 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
     day_target = np.zeros(6)                                   # daily plan of the current day (H6 reference)
     head_lost_steps = np.zeros(6, int)
     known_openings = actuator.position.copy()                  # gate positions last reported over the radio
+    radio_prev = True                                          # telemetry during the previous step
 
     for k in range(P * spd):                                   # time_grid
         p = k // spd
@@ -421,6 +462,9 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
             observation, command = obs0, cmd0
         else:
             observation = last_obs                             # measurement at the end of the previous step
+            if not radio_prev:                                 # no telemetry: the controller knows the reported gates
+                observation = Observation(last_obs.t, last_obs.day, last_obs.step, last_obs.level, last_obs.inflow,
+                                          known_openings.copy())
             state = estimator.state(observation, plant if oracle else None)
             command = controller.step(state=state, demand=demand, supply=supply_at(p), constraints=m,
                                       horizon=hz).validate()
@@ -448,6 +492,7 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
         else:                                                  # no telemetry: prediction only, last reported gates
             estimator.update(Observation(last_obs.t, last_obs.day, last_obs.step, None, last_obs.inflow,
                                          known_openings.copy()), S[p])
+        radio_prev = radio
         if energy is not None:                                 # (16): load and messages (uplink + downlink)
             energy.advance(k, int(radio) + (actuator.packets_sent - tx0))
         recorder.write(p, command, t=plant.solver.t, h_true=plant.truth()["level"], h_est=estimator.h, q_in=S[p],
@@ -462,4 +507,5 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
                             0 if energy is None else energy.radio_off_steps,
                             0.0 if energy is None else float(energy.used_wh),
                             actuator.link.blocked if actuator.limited else 0,
-                            actuator.link.lost if actuator.limited else 0)
+                            actuator.link.lost if actuator.limited else 0,
+                            plant.low_head_steps, plant.low_head_volume)

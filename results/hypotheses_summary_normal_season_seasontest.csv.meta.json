@@ -1,12 +1,12 @@
 {
   "result": "hypotheses_summary_normal_season_seasontest.csv",
-  "created_utc": "2026-10-19T06:41:24+00:00",
+  "created_utc": "2026-10-21T17:11:00+00:00",
   "command": "scripts/evaluate_hypotheses.py --bootstrap season --inference season",
   "environment": {
-    "python": "3.13.5",
-    "platform": "Windows-10-10.0.19045-SP0",
-    "machine": "AMD64",
-    "water01": "1.1.0",
+    "python": "3.13.16",
+    "platform": "Linux-6.18.44-fc-v139-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "water01": "1.2.0",
     "highs": "1.8.0",
     "numpy": "2.3.5",
     "scipy": "1.17.0",
@@ -14,9 +14,9 @@
     "PyYAML": "6.0.3"
   },
   "pin_mismatches": {},
-  "code_sha256": "38c226bfc8ca0fcc604d1b2ce8beda8ce8f9f1154618f5cfd29d7689ddf0ef82",
+  "code_sha256": "011b0c9bd66d3d93209c46229d9066dd9a1f868249aeadbc1b5dfe35a43a1014",
   "inputs": {
-    "configs/kegeyli_reference.yaml": "dd374fa8f1d0a2c149692bc30cf6b14ced6db263548b4bc3b14718eb2c5d8390",
+    "configs/kegeyli_reference.yaml": "e5b1b6bebfd79c8f66ff1ef74ba13a702f46aca5e063ff6a342e1961bc103e73",
     "configs/scenarios/normal.yaml": "87df387bc87601bda78709c215b7779eeb132f8c19011cea8eb1140c2c4aba3b",
     "requirements/hypotheses.md": "fa2ab7becf537ef71eab4fe0e5e6530682ed451a5526b3f6b4b02cbd196ff2f4"
   },
@@ -24,7 +24,10 @@
     "scenario": "normal",
     "data": "normal",
     "bootstrap": "season",
-    "inference": "season"
+    "inference": "season",
+    "evaluator_sha256": "d876dee532e839b0a9219ddfda54728cc9325d41c776a8914d29c2a750877d55",
+    "daily_results_sha256": "ab1e651e8447dcd1799307d08e36afa4933dd30d4b09227d8a8a22a310875fe4",
+    "daily_results_files": 390
   },
   "scenario": "normal",
   "config": {
@@ -103,11 +106,11 @@
       "status": "derived"
     },
     "A_s_identified_m2": {
-      "value": 371000.0,
+      "value": 391000.0,
       "status": "derived"
     },
     "tau_identified_s": {
-      "value": 1530.0,
+      "value": 1380.0,
       "status": "derived"
     },
     "id_step_dq_m3s": {
@@ -249,6 +252,22 @@
     },
     "gate_head_regularisation_m": {
       "value": 0.001,
+      "status": "setting"
+    },
+    "plant_substeps": {
+      "value": 1,
+      "status": "setting"
+    },
+    "gate_change_at_step_start": {
+      "value": true,
+      "status": "setting"
+    },
+    "gate_change_first_theta": {
+      "value": 1.0,
+      "status": "setting"
+    },
+    "ledger_constant_openings": {
+      "value": true,
       "status": "setting"
     },
     "lp_primal_feasibility_tolerance": {

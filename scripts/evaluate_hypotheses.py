@@ -9,8 +9,8 @@
       tuned (primary) and untuned (secondary);
   H5  Oracle gap: gap_LXB - gap_b = lambda_b - lambda_LXB. The Oracle cancels in the paired difference, so H5 is
       the sign-reversed copy of H1 and is reported as descriptive;
-  H6  days with S < Q_c: steps at which the head at a small regulator cannot pass the planned rate, LXB - B0/B3,
-      "decrease"; not testable when no such step occurs;
+  H6  days with S < Q_c: share of user-day pairs at the small regulators with at least one step at which the head
+      cannot pass the planned rate, LXB - B0/B3, "decrease"; not testable when no such step occurs;
   H7  (a) P1_LXB[p] - P1_B1[p] (B1 under the IoT chain as the open-loop reference), "decrease", tuned;
       (b) Shapley values (18) per season, v(F) = mean daily P1 of LXB (tuned) over the 16 coalitions;
           d_y = phi_Q + phi_C - phi_S; interval from a season bootstrap; supported if the lower bound > 0.
@@ -35,7 +35,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from water01.domain.passport import USERS, value  # noqa: E402
 from water01.evaluation.hypotheses import evaluate_family, holm_families  # noqa: E402
 from water01.evaluation.metrics import shapley  # noqa: E402
-from water01.simulation.provenance import config_inputs, write_metadata  # noqa: E402
+from water01.simulation.provenance import (all_code_sha256, config_inputs, files_sha256,  # noqa: E402
+                                          write_metadata)
 from water01.simulation.scenarios import load_config  # noqa: E402
 
 SMALL = USERS[1:5]
@@ -194,17 +195,22 @@ def evaluate(df, seed, supply_csv=RECORDS_SUPPLY):
                              decision="not available", note="needs the operating records (DATA/processed)")
                         for b in fam["H6"])
             continue
-        v6 = v[v.date.isin(low)].copy()
-        v6["lost_small"] = v6[[f"lost_{u}" for u in SMALL]].sum(axis=1)
+        on = v.date.isin(low)
+        v6 = (v if SCHEME == "calendar" else v[on]).copy()  # calendar bootstrap: excluded days stay as NaN
+        cols = [f"lost_{u}" for u in SMALL]
+        v6["lost_small"] = (v6[cols] > 0).mean(axis=1)       # share of user-day pairs with command loss (protocol)
+        v6["lost_steps"] = v6[cols].sum(axis=1)
+        if SCHEME == "calendar":
+            v6.loc[~on[v6.index], ["lost_small", "lost_steps"]] = np.nan
         d = {}
         for b in fam["H6"]:
             if {"LXB", b} <= set(v6.method) and len(v6):
                 d[b], yrs = paired(v6, "LXB", b, "lost_small")
-        total = int(v6[v6.method.isin(["LXB"] + list(fam["H6"]))].lost_small.sum())
+        total = int(np.nansum(v6[v6.method.isin(["LXB"] + list(fam["H6"]))].lost_steps))
         note = f"steps without sufficient head at the small regulators: {total}"
         if d and total == 0:
             rows.extend(dict(hypothesis="H6", comparison=f"LXB − {b}", variant=var, role="primary", estimate=0.0,
-                             n_days=len(d[b]), decision="not testable", note=note) for b in d)
+                             n_days=int(np.isfinite(d[b]).sum()), decision="not testable", note=note) for b in d)
         else:
             run_family(rows, "H6", "LXB − ", var, d, yrs, "decrease", seed, note=note)
     # H2: d_lambda = lambda(tuned, phys) - lambda(perturbed); LXB - B1
@@ -320,9 +326,11 @@ def main():
     path.with_suffix(".md").write_text(to_markdown(res), encoding="utf-8")
     if table is not None and not suffix:
         table.to_csv(ROOT / f"results/shapley_by_year_{cfg.scenario}.csv", index=False)
+    daily, n_daily = files_sha256((ROOT / "results/experiment" / (a.data or cfg.scenario)).glob("*.csv"), ROOT)
     write_metadata(path, ROOT, config_inputs(cfg, ROOT) + ("requirements/hypotheses.md",),
                    {"scenario": cfg.scenario, "data": a.data or cfg.scenario, "bootstrap": a.bootstrap,
-                    "inference": a.inference}, cfg)
+                    "inference": a.inference, "evaluator_sha256": all_code_sha256(ROOT),
+                    "daily_results_sha256": daily, "daily_results_files": n_daily}, cfg)
     print(f"-> {path.relative_to(ROOT).as_posix()}")
 
 

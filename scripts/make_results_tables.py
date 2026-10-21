@@ -73,7 +73,8 @@ EXPL_TABLE_HEAD = ["Comparison", "Chain", "Estimate [95% CI]", "p (Holm)", "Sign
                    "Seasons as units: 95% CI; p (Holm)"]
 EPS_LAMBDA = 0.01                                     # practical margin of the lambda comparisons (Section 2.9)
 DEC = {"superior": "Superior", "non-inferior": "Non-inferior", "supported": "Supported", "rejected": "Rejected",
-       "inconclusive": "Inconclusive", "not testable": "Not testable", "no data": "No data"}
+       "inconclusive": "Inconclusive", "not testable": "Not testable", "no data": "No data",
+       "not available": "Not available"}
 
 
 def exploratory(d, N):
@@ -291,9 +292,10 @@ def shapley(v):
     return phi
 
 
-def attribution(N, day="2014-06-06"):
+def attribution(N, day=None):
     """Shapley attribution of the ratio-of-means price of LXB (tuned) over all seasons and per season, and the
-    coalition prices of the day with the largest seasonal residual (default 6 June 2014)."""
+    coalition prices of one day: by default the day whose daily price of the sensor-only coalition has the largest
+    magnitude, with its share of the summed magnitudes of that season (concentration of the mean-daily value)."""
     rd = os.path.join(ROOT, "results/experiment/normal")
     lam = {c: [] for c in ["phys"] + CODES}
     for y in range(2010, 2020):
@@ -314,6 +316,15 @@ def attribution(N, day="2014-06-06"):
         N[f"phi_ratio_{k}"] = float(allr[f"phi_{k}"])
     N["phi_ratio_price"] = float(allr.price)
     N["phi_ratio_seasonal_sum_mean"] = float(t.iloc[1:].price.mean())
+    if day is None:
+        best = (0.0, None, 0.0)
+        for i_, ph_ in enumerate(lam["phys"]):
+            ok = ph_ > 0
+            pr = ((ph_[ok] - lam["S"][i_].reindex(ph_.index)[ok]) / ph_[ok]).abs()
+            if len(pr) and pr.max() > best[0]:
+                best = (float(pr.max()), str(pr.idxmax()), float(pr.max() / pr.sum()) if pr.sum() > 0 else 0.0)
+        day = best[1] or str(lam["phys"][0].index[0])
+        N["day_coalitions_share"] = best[2]
     y = int(day[:4]); i = y - 2010
     ph = float(lam["phys"][i].loc[day])
     coal = [dict(coalition="phys", lam=ph, price=0.0)]
@@ -436,8 +447,7 @@ def changed_text(N):
     for label, f in (("5-day blocks", "hypotheses_summary_block_5.csv"), ("20-day blocks", "hypotheses_summary_block_20.csv"),
                      ("circular blocks", "hypotheses_summary_normal_circular.csv"),
                      ("the season bootstrap", "hypotheses_summary_normal_season.csv"),
-                     ("the calendar bootstrap", "hypotheses_summary_normal_calendar.csv"),
-                     ("seasons as the units of inference", "hypotheses_summary_normal_season_seasontest.csv")):
+                     ("the calendar bootstrap", "hypotheses_summary_normal_calendar.csv")):
         path = os.path.join(ROOT, "results", f)
         if not os.path.exists(path):
             continue
@@ -458,7 +468,7 @@ def write_s8(tS7, tR, N):
             "calendar_bootstrap_changed")
     ch = [N.get(k, 0) for k in keys]
     st = N.get("seasontest_changed", 0)
-    st_txt = "; ".join(x.replace("->", "→").replace("/iot", "/IoT").replace("_", " ").replace("gap LXB", "gap~LXB~").replace("gap B2", "gap~B2~")
+    st_txt = "; ".join(x.replace("->", "→").replace("/iot", "/IoT").replace("_", " ").replace("gap LXB", "gap~LXB~").replace("gap B2", "gap~B2~").replace("gap B3", "gap~B3~").replace("gap B0", "gap~B0~").replace("gap B1", "gap~B1~")
                        for x in N.get("seasontest_changed_list", []))
     lines = ["## S8. Exploratory Controllers, Added Cases, and Robustness Runs", "",
              "The runs of this section were not pre-specified and are reported as exploratory (Section 2.10). The "
@@ -467,17 +477,18 @@ def write_s8(tS7, tR, N):
              "three further random seeds (sensor noise and packet loss), replaces the limit forecast by a "
              "leave-one-year-out mean, and fills the blank supply entries with the last recorded value of the same season; "
              "all use tuned gate coefficients. Across the four seeds, the price of LXB ranged from "
-             f"{min(pr) * 100:.1f}% to {max(pr) * 100:.1f}%. The decisions in Table S6 were recomputed with bootstrap "
+             f"{min(pr) * 100:.2f}% to {max(pr) * 100:.2f}%. The decisions of the pre-specified daily analysis were recomputed with bootstrap "
              "blocks of 5 and 20 days, with circular blocks, with a bootstrap over whole seasons, and with moving blocks "
              "on the full season calendar; "
              + (f"none of the {N['tests_n']} decisions changed under any of these settings" if not any(ch) else
                 ", ".join(str(c) for c in ch) + f" of the {N['tests_n']} decisions changed, respectively"
                 f"{changed_text(N)}")
-             + (f". With the ten seasons as the units of inference, {st} decisions changed ({st_txt})" if st else
-                ". With the ten seasons as the units of inference, no decision changed")
+             + (f". The season-level analysis of Table 6 differs from the daily analysis in {st} decisions ({st_txt})" if st else
+                ". The season-level analysis of Table 6 gives the same decisions as the daily analysis")
              + ". Table S7b gives the volume-weighted satisfaction *R*~vol~ of Section 2.7, Table S7c the sensitivity "
              "cases added after the main runs, Table S7d the execution variants, and Table S7e the attribution of the "
-             "price as a ratio of means and the coalition prices of the day that dominates the 2014 attribution.", "",
+             "price as a ratio of means and the coalition prices of the day with the largest daily price of the sensor-only "
+             "constraint set.", "",
              "<!-- widths: 30,20,12,12,13,13 -->", "",
              "**Table S7a.** Robustness of the IoT price and of the advantage of LXB (tuned gate coefficients, ten seasons). "
              "Π~1~ as a ratio of means; for the blank-supply case, the phys reference is the phys run of the same case.", ""]
@@ -550,13 +561,18 @@ def write_s8(tS7, tR, N):
               "descriptive). The pre-specified attribution of the mean daily price (H7b) is given in Table S6.", ""]
     lines += ["| " + " | ".join(md(c) for c in t[0]) + " |", "|" + "---|" * len(t[0])] + \
         ["| " + " | ".join(md(c) for c in r) + " |" for r in t[1:]]
-    co = pd.read_csv(os.path.join(TABLES, "coalitions_2014-06-06.csv"))
+    day = N["day_coalitions_date"]
+    co = pd.read_csv(os.path.join(TABLES, f"coalitions_{day}.csv"))
     cells = "; ".join(f"{r.coalition.replace('IoT (SQCE)', 'SQCE')} {minus(f'{100 * r.price:.2f}')}%"
                       for r in co.itertuples() if r.coalition != "phys")
-    lines += ["", f"On 6 June 2014, the phys run released only a residual (*λ*^phys^ = "
-              f"{md(sci(N['day_coalitions_lam_phys']))}). "
-              + f"The daily prices of the 15 constraint sets were: {cells}. Each value is the relative change of a "
-              "satisfaction close to zero, so this single day decides the sign and size of the mean-daily *φ*~S~ of 2014."]
+    share = N.get("day_coalitions_share", np.nan)
+    ts = pd.Timestamp(day); date_txt = f"{ts.day} {ts.strftime('%B %Y')}"
+    lines += ["", f"The largest daily price of the sensor-only constraint set occurred on {date_txt} "
+              f"(*λ*^phys^ = {md(sci(N['day_coalitions_lam_phys'])) if N['day_coalitions_lam_phys'] < 0.01 else format(N['day_coalitions_lam_phys'], '.3f')}); this day carries "
+              f"{100 * share:.0f}% of the summed magnitudes of the daily sensor prices of {day[:4]}. "
+              + f"The daily prices of the 15 constraint sets on that day were: {cells}."
+              + (" Each value is the relative change of a satisfaction close to zero, so this single day dominates "
+                 f"the mean-daily *φ*~S~ of {day[:4]}." if share > 0.5 and N["day_coalitions_lam_phys"] < 0.01 else "")]
     open(os.path.join(TABLES, "supplementary_s8.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
 
 
@@ -615,7 +631,8 @@ def main():
             t["Z3"] = t.groupby("year")[rc].diff().abs().sum(axis=1, min_count=1)
             zz[v] = t.set_index(["year", "date"])
         ok = zz["phys"]["lambda"] > 0
-        z2p, z2i = zz["phys"].Z2[ok], zz["iot"].Z2[ok]
+        ok2 = (zz["phys"].Z2 > 0) & zz["iot"].Z2.reindex(zz["phys"].index).notna()   # P2 has Z2_phys in the denominator
+        z2p, z2i = zz["phys"].Z2[ok2], zz["iot"].Z2.reindex(zz["phys"].index)[ok2]
         p2 = (z2p - z2i) / z2p
         N[f"pi2_mean_{tn}"] = p2.mean(); N[f"pi2_median_{tn}"] = p2.median()
         N[f"pi2_ratio_{tn}"] = (z2p.mean() - z2i.mean()) / z2p.mean()
@@ -678,6 +695,8 @@ def main():
         if r.hypothesis == "H6" and r.estimate == 0 and r.ci_low == 0 and r.ci_high == 0:
             return "0 (no events)"
         vals = [v for v in (r.estimate, r.ci_low, r.ci_high) if pd.notna(v)]
+        if not vals:
+            return "—"
         tiny = max(abs(v) for v in vals) < 5e-4 and any(v != 0 for v in vals)
         ci = f" [{num(r.ci_low, tiny)}, {num(r.ci_high, tiny)}]" if pd.notna(r.ci_low) else ""
         return num(r.estimate, tiny) + ci
@@ -754,20 +773,32 @@ def main():
         N["H1_superior_seasons"] = int((h1s.decision == "superior").sum())
     rH7a = g1("H7", "Π1_LXB − Π1_B1 (IoT-open)", "tuned: phys → iot")
     rH7b = g1("H7", "φ_Q + φ_C − φ_S", "tuned")
+    # principal reporting: the ten seasons as the units of inference (season bootstrap interval, exact sign-flip test);
+    # the pre-specified daily analysis is given alongside
+    HS_ = {} if st is None else {(r.hypothesis, r.comparison, r.variant): r for _, r in st.iterrows()}
+    sg = lambda r: HS_.get((r.hypothesis, r.comparison, r.variant), r)
+    h1p = st[st.hypothesis == "H1"] if st is not None else h1
+
+    def dec2(r):
+        s_ = sg(r)
+        out = DEC.get(s_.decision, s_.decision)
+        return out if s_.decision == r.decision else f"{out} (daily analysis: {DEC.get(r.decision, r.decision).lower()})"
+
     def h1_chain(v):                       # protocol: non-inferior or superior against all four, superior against one
-        x = h1[h1.variant == v].decision
+        x = h1p[h1p.variant == v].decision
         return x.isin(["superior", "non-inferior"]).all() and (x == "superior").any()
     chains = sorted(h1.variant.unique())
     n_ok = sum(h1_chain(v) for v in chains)
     h1_text = (f"Supported in all {len(chains)} chains" if n_ok == len(chains) else
                f"Supported in {n_ok} of {len(chains)} chains")
-    ni = h1[h1.decision == "non-inferior"]
+    ni = h1p[h1p.decision == "non-inferior"]
     ni_txt = ", ".join(f"{c.split(' − ')[-1]}, {v.replace('/iot', ' IoT').replace('/phys', ' phys')}"
                        for c, v in zip(ni.comparison, ni.variant))
     h3tol = h[(h.hypothesis == "H3") & (h.role == "tolerance")]
-    h3_tol_ok = h3tol.decision.isin(["superior", "non-inferior"]).all()
+    h3_tol_ok = len(h3tol) > 0 and h3tol.decision.isin(["superior", "non-inferior"]).all()
     h6 = h[h.hypothesis == "H6"]
-    h6_none = (h6.decision == "not testable").all()
+    h6_none = len(h6) > 0 and (h6.decision == "not testable").all()
+    h6_na = len(h6) == 0 or (h6.decision == "not available").all()
     phiC = N["phi_communication"]
     h7b_text = DEC.get(rH7b.decision, rH7b.decision)
     if rH7b.decision == "supported":
@@ -775,23 +806,28 @@ def main():
                      abs(phiC) < 0.1 * abs(N["phi_quantisation"]) else "")
     t7 = [["Hypothesis", "Test (paired by day unless stated)", "Estimate [95% CI]; sign stability", "Decision"],
           ["H1", "LXB − B0, B1, B2, B3; daily *λ*; four chains (16 comparisons)",
-           minus(f"{N['H1_min']:+.3f} to {N['H1_max']:+.3f}") + f"; superior in {N['H1_superior']}"
-           + (f", non-inferior in {N['H1_noninferior']} ({ni_txt})" if N["H1_noninferior"] else "")
-           + (f"; seasons as units: superior in {N['H1_superior_seasons']}" if "H1_superior_seasons" in N else ""),
+           minus(f"{N['H1_min']:+.3f} to {N['H1_max']:+.3f}")
+           + f"; superior in {int((h1p.decision == 'superior').sum())}"
+           + (f", non-inferior in {len(ni)} ({ni_txt})" if len(ni) else "")
+           + f"; daily analysis: superior in {N['H1_superior']}",
            h1_text],
-          ["H2", "Δ*λ*{~LXB~} − Δ*λ*{~B1~}, tuned phys → untuned IoT", f"{est(rH2)}; {sign(rH2)}",
-           minus(f"{DEC[rH2.decision]} (secondary: IoT only {rH2c.estimate:+.3f}, {rH2c.decision}; model error only "
-                 f"{rH2b.estimate:+.3f}, {rH2b.decision})")],
-          ["H3", "*Z*{~3~}: LXB − LXB-noS3, tuned phys", f"{est(rH3)}; *λ* and *Z*{{~2~}}/6 "
-           + ("non-inferior within *ε*{~λ~}" if h3_tol_ok else "outside the tolerance"), DEC[rH3.decision]],
-          ["H4", "Mean daily Π{~1~} of LXB, tuned (secondary: untuned)", minus(f"{est(rH4)}, season bootstrap [{s4.ci_low:+.3f}, {s4.ci_high:+.3f}]; untuned {rH4u.estimate:+.3f}; "
-                 f"{sign(rH4)}"),
-           DEC[rH4.decision]],
+          ["H2", "Δ*λ*{~LXB~} − Δ*λ*{~B1~}, tuned phys → untuned IoT", f"{est(sg(rH2))}; {sign(rH2)}",
+           minus(f"{dec2(rH2)} (secondary: IoT only {rH2c.estimate:+.3f}, {sg(rH2c).decision}; model error only "
+                 f"{rH2b.estimate:+.3f}, {sg(rH2b).decision})")],
+          ["H3", "*Z*{~3~}: LXB − LXB-noS3, tuned phys", f"{est(sg(rH3))}; *λ* and *Z*{{~2~}}/6 "
+           + ("non-inferior within *ε*{~λ~}" if h3_tol_ok else "outside the tolerance"),
+           DEC[rH3.decision] if h3_tol_ok or rH3.decision != "supported" else "Not supported (tolerance not met)"],
+          ["H4", "Mean daily Π{~1~} of LXB, tuned (secondary: untuned)",
+           minus(f"{est(sg(rH4))}") + "; pre-specified moving block "
+           + minus(f"[{rH4.ci_low:+.3f}, {rH4.ci_high:+.3f}]; untuned {rH4u.estimate:+.3f}; {sign(rH4)}"),
+           dec2(rH4)],
           ["H5", "gap{~LXB~} − gap{~b~}", "Identical to −(H1 difference)", "Descriptive"],
-          ["H6", "Steps without sufficient head at outlets 2–5, LXB − B0, B3, days with *S* < *Q*{~c~}",
+          ["H6", "Share of user–days with command loss at outlets 2–5, LXB − B0, B3, days with *S* < *Q*{~c~}",
+           "Operating records not available" if h6_na else
            "No such step for any method or chain" if h6_none else "; ".join(est(r) for _, r in h6.iterrows()),
-           "Not testable" if h6_none else ", ".join(sorted(set(DEC[x] for x in h6.decision)))],
-          ["H7a", "Π{~1~}: LXB − B1 (IoT open loop), tuned", f"{est(rH7a)}; {sign(rH7a)}", DEC[rH7a.decision]],
+           "Not available" if h6_na else "Not testable" if h6_none else
+           ", ".join(sorted(set(DEC.get(x, x) for x in h6.decision)))],
+          ["H7a", "Π{~1~}: LXB − B1 (IoT open loop), tuned", f"{est(sg(rH7a))}; {sign(rH7a)}", dec2(rH7a)],
           ["H7b", "*φ*{~Q~} + *φ*{~C~} − *φ*{~S~}, seasons", f"{est(rH7b)}; {sign(rH7b)}", h7b_text]]
     N["tests_n"] = int(len(h))
     N["H1_chains_supported"] = int(n_ok)
@@ -835,6 +871,9 @@ def main():
         L, Z = N["h3strict_lambda"], N["h3strict_Z2_(sum)"]
         h3s = (f"*λ*: {fm(L[0])} [{fm(L[1])}, {fm(L[2])}], {L[3]}; *Z*~2~: {fm(Z[0])} [{fm(Z[1])}, {fm(Z[2])}], {Z[3]}")
     lines = ["## S7. Results of All Hypothesis Tests", "",
+             "Table S6 gives two analyses of every test. The columns from the estimate to the decision give the "
+             "pre-specified daily analysis, recorded as the original analysis; the last column gives the decision with the "
+             "ten seasons as the units of inference, which is the principal analysis of the article (Section 2.9). "
              "Decisions follow the pre-specified rules (Section 2.9): superiority (or a "
              "supported decrease) requires the 95% confidence interval to exclude zero on the predicted side, a Holm-adjusted "
              "*p*-value below 0.05, and the expected sign in at least 7 of 10 seasons; non-inferiority requires only a lower "
@@ -865,7 +904,20 @@ def main():
     if rev:
         write_s8(tS7, tR, N)
     json.dump(out, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    # provenance of the tables: the code base and every stored result and summary that was available
+    sys.path.insert(0, os.path.join(ROOT, "src"))
+    from water01.simulation.provenance import all_code_sha256, files_sha256
+    from pathlib import Path
+    res = [p for p in Path(ROOT, "results").rglob("*.csv") if "tables" not in p.parts and "experiment_check" not in p.parts
+           and "verification" not in p.parts]
+    digest, n = files_sha256(res, Path(ROOT))
+    json.dump({"code_sha256_all": all_code_sha256(ROOT), "results_sha256": digest, "results_files": n},
+              open(os.path.join(TABLES, "PROVENANCE.json"), "w", encoding="utf-8"), indent=1)
     print(f"-> {OUT}: Table 7 ({len(t6) - 1}), Table 6 ({len(t7) - 1}), Table S6 ({len(tS6) - 1}), {len(N)} numbers")
+    if not os.path.exists(DEMAND):
+        print("Regenerated from the stored results: Tables 6-8, S6, S7a-S7e, the price, Shapley and sensitivity numbers. "
+              "Skipped (need DATA/processed/demand_decadal.csv): the demand-floor checks, the demand of R-1, the "
+              "delivered volume relative to the demand.")
 
 
 if __name__ == "__main__":

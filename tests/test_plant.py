@@ -95,8 +95,9 @@ def test_id_model_identified_from_saint_venant_step():
     hold = PARAMETERS["H_norm_m"].value; out = {}
     for N, dt in ((58, DT), (115, DT / 2)):
         for dq in (1.0, -1.0):
-            run = step_response(Reach(N=N), Q_C, hold, dq, 6 * 3600, dt)
-            out[N, dq] = identify_from_step(run["t"], run["h_L"], dq)
+            eta = PARAMETERS["eta"].value
+            run = step_response(Reach(N=N), Q_C, hold, dq, 6 * 3600, dt, eta=eta)
+            out[N, dq] = identify_from_step(run["t"], run["h_L"], eta * dq)
     A_TL = PARAMETERS["A_s_m2"].value
     A = np.array([v[0] for v in out.values()]); tau = np.array([v[1] for v in out.values()])
     assert np.all((0.5 * A_TL < A) & (A < A_TL))

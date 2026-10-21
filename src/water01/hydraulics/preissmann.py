@@ -22,7 +22,8 @@ class PreissmannSolver:
     downstream(t, hN, QN) -> residual; e.g. QN − Q_out(hN) (Dustlik node) or hN − h_set.
     """
 
-    def __init__(self, reach, dt, h, Q, upstream, downstream, theta=None, eta=1.0, tol=None, max_iter=None):
+    def __init__(self, reach, dt, h, Q, upstream, downstream, theta=None, eta=1.0, tol=None, max_iter=None,
+                 substeps=1):
         theta = value("preissmann_theta") if theta is None else theta
         tol = value("newton_tolerance") if tol is None else tol
         max_iter = value("newton_max_iter") if max_iter is None else max_iter
@@ -37,13 +38,18 @@ class PreissmannSolver:
         self.last_iterations = 0
         self.last_ql = 0.0
         self.substeps = 1
+        self._theta_now = None                      # time weight of the current hydraulic step (None: theta)
+        self.first_theta = None                     # one-off time weight of the first hydraulic step of the next step()
+        self.base_substeps = int(substeps)          # hydraulic steps per control step (plant_substeps)
+        if self.base_substeps < 1:
+            raise ValueError("substeps >= 1")
 
     @property
     def state(self):
         return CanalState(self.t, self.h.copy(), self.Q.copy())
 
     def residual(self, z, ho, Qo, t_new, ql, dt=None):
-        r, th, dx = self.r, self.theta, self.r.dx
+        r, th, dx = self.r, (self.theta if self._theta_now is None else self._theta_now), self.r.dx
         dt = self.dt if dt is None else dt
         h = z[0::2]; Q = z[1::2]
         A, Ao = r.area(h), r.area(ho)
@@ -106,29 +112,39 @@ class PreissmannSolver:
             z, F = z_try, F_try
             # convergence is tested on the full Newton step (a short damped step must not signal false convergence)
             if np.max(np.abs(dz)) < self.tol * max(1.0, np.max(np.abs(z))):
-                th = self.theta
+                th = self.theta if self._theta_now is None else self._theta_now
                 self.h, self.Q, self.t = z[0::2], z[1::2], t_new
                 self.last_iterations = it
                 flux = dt * (th * (self.Q[0] - self.Q[-1]) + (1 - th) * (Qo[0] - Qo[-1]) + ql * self.r.L)
-                return ql * dt, flux, (dt, float(self.h[-1]))
+                return ql * dt, flux, (dt, float(self.h[-1]), th)
         raise RuntimeError(f"Newton: no convergence in {self.max_iter} iterations (t = {t_new:.0f} s, Δt = {dt:.0f} s)")
 
     def step(self):
-        """One Δt step. If Newton does not converge (e.g. head across a gate near zero, where the smoothed gate
-        equation is steep), the step is split into 2, 4 or 8 equal substeps. last_ql: step-averaged q_l; last_net_inflow:
+        """One Δt (control) step, integrated with base_substeps equal hydraulic steps. If Newton does not converge
+        (e.g. head across a gate near zero, where the smoothed gate equation is steep), the number of hydraulic steps
+        is doubled up to six times (64 hydraulic steps). last_ql: step-averaged q_l; last_net_inflow:
         discrete net inflow volume over the step; last_substeps: substeps (Δt_i, h_L).
         Returns: (h, Q)."""
         h0, Q0, t0 = self.h.copy(), self.Q.copy(), self.t
-        for n_sub in (1, 2, 4, 8):
+        first, self.first_theta = self.first_theta, None
+        for n_sub in (self.base_substeps * f for f in (1, 2, 4, 8, 16, 32, 64)):
             self.h, self.Q, self.t = h0.copy(), Q0.copy(), t0
             try:
-                parts = [self._advance(self.dt / n_sub) for _ in range(n_sub)]
+                parts = []
+                for i in range(n_sub):
+                    # after a discontinuous boundary change, the first hydraulic step can be fully implicit (theta = 1),
+                    # which damps the alternating mode that the theta scheme leaves after a jump
+                    self._theta_now = first if i == 0 else None
+                    parts.append(self._advance(self.dt / n_sub))
             except RuntimeError:
                 continue
+            finally:
+                self._theta_now = None
+            self.t = t0 + self.dt                                # no drift of the clock from summing substeps
             self.last_ql = sum(p[0] for p in parts) / self.dt
             self.last_net_inflow = sum(p[1] for p in parts)      # Δt(θ ΔQ_new + (1−θ) ΔQ_old + q_l L): mass balance
-            self.last_substeps = [p[2] for p in parts]           # [(Δt_i, h_L)]: for computing node volumes
+            self.last_substeps = [p[2] for p in parts]           # [(Δt_i, h_L, θ_i)]: for computing node volumes
             self.substeps = n_sub
             return self.h, self.Q
         self.h, self.Q, self.t = h0, Q0, t0
-        raise RuntimeError(f"Newton did not converge even with the step split into 8 (t = {t0 + self.dt:.0f} s)")
+        raise RuntimeError(f"Newton did not converge even with the step split into 64 (t = {t0 + self.dt:.0f} s)")

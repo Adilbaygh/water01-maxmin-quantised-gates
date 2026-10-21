@@ -62,3 +62,28 @@ def test_exploratory_groups_and_case_runs():
     from run_experiment import EXPLORATORY, groups
     assert sum(len(ms) * len(tu) * len(io) for ms, tu, io in groups("dt_450")) == 5
     assert all(groups(c) for c in EXPLORATORY)
+
+
+def test_gate_change_at_step_start_credits_a_pulse_to_its_step():
+    """A one-step pulse of the smallest executable opening: with the gate change at the start of the step, the whole
+    pulse volume is credited to the step in which the gate is open, for any number of hydraulic steps; with the
+    theta-weighted change of the first code versions, only theta + (1 - theta)(1 - 1/n) of it."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from verification_pulse import run
+    for n in (1, 2):
+        old, new = run(n, False), run(n, True)
+        theta = load_config().preissmann_theta
+        assert abs(old["share_in_open_step"] - (1 - (1 - theta) / n)) < 1e-3
+        assert new["share_in_open_step"] > 0.999
+        assert abs(new["vol_total_m3"] - old["vol_total_m3"]) < 1e-3 * old["vol_total_m3"]
+    load_config()
+
+
+def test_season_signflip_uses_the_day_weighted_estimate():
+    from water01.evaluation.statistics import season_signflip
+    d = np.r_[np.full(10, 1.0), np.full(30, 3.0), [np.nan] * 5]
+    g = np.r_[np.zeros(10), np.ones(30), np.ones(5)]
+    est, p = season_signflip(d, g)
+    assert abs(est - np.nanmean(d)) < 1e-12 and p == 0.5          # two seasons: 2 of 4 patterns as extreme

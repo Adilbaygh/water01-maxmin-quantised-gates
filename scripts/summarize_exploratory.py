@@ -18,7 +18,12 @@ Sections:
   8. untuned_reverse reverse gate mismatch (LXB, B0, B3, B3V);
   9. final_share     LXB-F (execution LP on the final daily share of each user) against LXB;
  10. b3v_deadband    B3V-DA (B3V with the pulse rule of LXB-DA) against B3V and LXB-DA, IoT chain;
- 11. dt_450          command step of 7.5 min instead of 15 min (LXB, B3 and LXB-DA, tuned).
+ 11. dt_450          command step of 7.5 min instead of 15 min (LXB, B3 and LXB-DA, tuned);
+ 14. terminal_weight_low  end-of-day level condition of the execution LP weighted 100 times less (LXB).
+ 13. plant_substeps_4  four hydraulic steps per 15-min control step (LXB, B3, LXB-DA): convergence of the closed loop.
+ 12. gate_head_h0    gate law with a ten times smaller smoothing scale at zero head (LXB, B0, B1, B3, tuned), and the
+                     exposure to the smoothed part of the gate law (steps and volume of open regulators with a head
+                     below 10 h0) in the baseline and in this case.
 Usage: python scripts/summarize_exploratory.py  ->  results/exploratory_summary.csv and .md
 """
 import argparse
@@ -314,6 +319,65 @@ def main():
         pr, _ = price(frame(f, "LXB", "tuned", "phys", ys), frame(f, "LXB-DA", "tuned", "iot", ys))
         add("dt_450", "dt_450", "LXB-DA", "tuned", "phys→iot", "price_ratio", pr, len(ys))
         md.append(f"| LXB-DA | Π1 (phys: LXB) | {len(ys)} | ratio {pr:.2%} | | | | |")
+    md.append("")
+
+    # 14. Weak terminal condition
+    f = R / "terminal_weight_low"
+    md += ["## 14. End-of-day level condition weighted 100 times less (LXB)", "",
+           "| Tuned | Chain | Years | λ (weak) | λ (base) | difference | mean daily h_min (weak) | mean daily h_min (base) |",
+           "|" + "---|" * 8]
+    for t in ("tuned", "untuned"):
+        for c in ("phys", "iot"):
+            ys = complete_years([(f, "LXB", t, c), (B, "LXB", t, c)])
+            if not ys:
+                continue
+            a_, b_ = frame(f, "LXB", t, c, ys), frame(B, "LXB", t, c, ys)
+            for k, x in (("lam", a_["lambda"].mean()), ("d_base", a_["lambda"].mean() - b_["lambda"].mean()),
+                         ("hmin", a_["h_min"].mean())):
+                add("terminal_weight_low", "terminal_weight_low", "LXB", t, c, k, x, len(ys))
+            md.append(f"| {t} | {c} | {len(ys)} | {a_['lambda'].mean():.4f} | {b_['lambda'].mean():.4f} | "
+                      f"{a_['lambda'].mean() - b_['lambda'].mean():+.4f} | {a_['h_min'].mean():.3f} | {b_['h_min'].mean():.3f} |")
+    md.append("")
+
+    # 13. Hydraulic step (verification)
+    f = R / "plant_substeps_4"
+    md += ["## 13. Hydraulic step of 225 s with the 15-min command step (plant_substeps_4, tuned)", "",
+           "| Method | Chain | Years | λ (225 s) | λ (900 s) | difference | max daily |Δλ| | max daily |ΔV| R-1, m³ |",
+           "|" + "---|" * 8]
+    for m, c, fb in (("LXB", "phys", B), ("LXB", "iot", B), ("B3", "phys", B), ("B3", "iot", B),
+                     ("LXB-DA", "iot", R / "deadband_aware")):
+        ys = complete_years([(f, m, "tuned", c), (fb, m, "tuned", c)])
+        if not ys:
+            continue
+        a_, b_ = frame(f, m, "tuned", c, ys), frame(fb, m, "tuned", c, ys)
+        dl = (a_["lambda"] - b_["lambda"]).abs().max(); dv = (a_["V_R-1"] - b_["V_R-1"]).abs().max()
+        for k, x in (("lam", a_["lambda"].mean()), ("d_900", a_["lambda"].mean() - b_["lambda"].mean()),
+                     ("max_abs_dlam", dl), ("max_abs_dV_R1", dv)):
+            add("plant_substeps_4", "plant_substeps_4", m, "tuned", c, k, x, len(ys))
+        md.append(f"| {m} | {c} | {len(ys)} | {a_['lambda'].mean():.4f} | {b_['lambda'].mean():.4f} | "
+                  f"{a_['lambda'].mean() - b_['lambda'].mean():+.5f} | {dl:.4f} | {dv:.2f} |")
+    md.append("")
+
+    # 12. Smoothing of the gate law at zero head
+    f = R / "gate_head_h0"
+    md += ["## 12. Gate law near zero head (h0 = 0.1 mm instead of 1 mm, tuned)", "",
+           "| Method | Chain | Years | λ (h0 0.1 mm) | λ (h0 1 mm) | difference | low-head steps (1 mm) | "
+           "low-head volume, m³ (1 mm) | low-head steps (0.1 mm) |", "|" + "---|" * 9]
+    for m in ("LXB", "B0", "B1", "B3"):
+        for c in ("phys", "iot"):
+            ys = complete_years([(f, m, "tuned", c), (B, m, "tuned", c)])
+            if not ys:
+                continue
+            a_, b_ = frame(f, m, "tuned", c, ys), frame(B, m, "tuned", c, ys)
+            exp = lambda d, col: (float(d.groupby("year")[col].first().sum()) if col in d.columns else float("nan"))
+            for k, x in (("lam", a_["lambda"].mean()), ("d_base", a_["lambda"].mean() - b_["lambda"].mean()),
+                         ("low_head_steps_base", exp(b_, "low_head_steps")),
+                         ("low_head_volume_base", exp(b_, "low_head_volume_m3")),
+                         ("low_head_steps", exp(a_, "low_head_steps"))):
+                add("gate_head_h0", "gate_head_h0", m, "tuned", c, k, x, len(ys))
+            md.append(f"| {m} | {c} | {len(ys)} | {a_['lambda'].mean():.4f} | {b_['lambda'].mean():.4f} | "
+                      f"{a_['lambda'].mean() - b_['lambda'].mean():+.4f} | {exp(b_, 'low_head_steps'):.0f} | "
+                      f"{exp(b_, 'low_head_volume_m3'):.0f} | {exp(a_, 'low_head_steps'):.0f} |")
     md.append("")
 
     pd.DataFrame(rows).to_csv(a.out + ".csv", index=False)

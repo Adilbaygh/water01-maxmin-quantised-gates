@@ -48,7 +48,8 @@ def opening_for_flow(flow, upstream_level, downstream_level, width_m, cd):
     head = float(upstream_level) - float(downstream_level)
     if head <= 1e-6:
         raise ValueError("No head across the gate: command lost")
-    return max(float(flow), 0.0) / (cd * width_m * np.sqrt(2 * G * head))
+    # the inverse of the forward law, including its smoothing near zero head (_sqrt_head)
+    return max(float(flow), 0.0) / (cd * width_m * np.sqrt(2 * G) * _sqrt_head(head))
 
 
 def untuned_factors(tuned, controller_gate_factor=None, offtake_factor=None):
