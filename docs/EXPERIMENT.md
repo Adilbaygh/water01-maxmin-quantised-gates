@@ -22,10 +22,10 @@ rule over the vegetation seasons 2010–2019.
   ρ = 0.001 of the travel (nearest rounding of the command); a change of the opening is executed only when it is at
   least the deadband δ = 0.005 of the travel, compared in whole steps, except the full closure n = 0, which is always
   executed. A gate that is closed therefore opens at least k = ⌈δ/ρ⌉ = 5 steps.
-- **Step volumes** (relation (6) of the article, `scripts/analysis_common.py`, class `Quanta`): g_j(h) — volume of one
-  resolution step during one step Δt at the level h upstream of the node; quantum q_j(h) = k g_j(h); pulse
-  p_j(h) = (k + 1) g_j(h), the volume of the pulse opening δ + ρ of the simulation core. At h = 3.0 m the R-1 regulator
-  has g ≈ 8.6 m³, q ≈ 43.1 m³, p ≈ 51.7 m³; the Abad-Yarmish regulator has q ≈ 605 m³.
+- **Step volumes** (Equation (4) of the article, `scripts/analysis_common.py`, class `Quanta`): v_j(h) — volume of one
+  resolution step during one step Δt at the level h upstream of the node; quantum q_j(h) = k v_j(h); pulse
+  p_j(h) = (k + 1) v_j(h), the volume of the pulse opening δ + ρ of the simulation core. At h = 3.0 m the R-1 regulator
+  has v ≈ 8.6 m³, q ≈ 43.1 m³, p ≈ 51.7 m³; the Abad-Yarmish regulator has q ≈ 605 m³.
 
 ## Execution rules (`scripts/rules.py`)
 
@@ -34,9 +34,9 @@ regulators.
 
 | Rule | Execution of the regulators | Theorem |
 |---|---|---|
-| LXB | commands of the execution programme as they are; a command inside the deadband of a closed gate is not executed (floor rounding: the delivered volume never exceeds the remaining plan) | 1(a) |
+| LXB | direct execution: commands of the execution programme as they are (the programme never requests more than the remaining plan); a command inside the deadband of a closed gate is not executed | 1(a) |
 | LXB-T000, LXB-T025, LXB-T050, LXB-T075 | θ pulse rule, θ = 0, 0.25, 0.5, 0.75: a command inside the deadband becomes one pulse when the remaining plan R_j is positive and R_j ≥ θ min{p_j, x_j}, and a closure otherwise; LXB-T050 coincides with the deadband-aware rule LXB-DA of the simulation core | 3 |
-| LXB-ES | equal split: a plan between one quantum at the upper operating level and the pulse-regime limit is delivered in m_j open steps separated by closed steps, m_j = min(⌈N/2⌉, max(1, ⌊x_j/(q_j^hi + g_j^hi)⌋)); a smaller plan uses the θ rule with θ = 0.5 | 1(b) |
+| LXB-ES | equal split with pulse fallback: a plan between one quantum at the upper operating level and the pulse-regime limit is delivered in m_j open steps separated by closed steps, m_j = min(⌈N/2⌉, max(1, ⌊x_j/(q_j^hi + v_j^hi)⌋)); the other plans are executed as under the θ rule with θ = 0.5 | 1(b) |
 | LXB-CO | carry-over: the θ rule (θ = 0.5) applied to the plan plus the estimated debt of the previous day, x̃_j(s) = x_j(s) + e_j(s−1), e_j(s) = x̃_j(s) − V̂_j(s); the regulator is closed for the day when x̃_j(s) ≤ 0 | 4 |
 
 ## Cases and seeds (`scripts/run_cases.py`)
@@ -60,11 +60,12 @@ pulses and of equal-split open steps, the number m_j of the equal split and the 
 | Part | Check | Quantities |
 |---|---|---|
 | t1 | Theorem 1(a): under LXB a regulator-day with 0 < x_j < (1 − 1/(2k)) q_j^min is excluded | predicted exclusions against regulator-days with the gate never open and against days without water, for the deadband, gate-coefficient and leakage cases (q_j^min at the minimum level of the day) |
-| t1 | Theorem 1(b): under LXB-ES, \|V_j − x_j\| ≤ g_j^max/2 | share of equal-split regulator-days within the bound, with V̂ and with V |
-| t2 | Theorem 2: 0 ≤ Π_ind ≤ Σq_j/ΣD_j, Π_ind = 0 ⇔ λ\* D_j ≥ q_j for every regulator; V < Σq_j^min forces a dry outlet | daily λ\*, quantised level λ_q and Π_ind = λ\* − λ_q of the node from the operating records (exact breakpoint algorithm of `quantmaxmin.allocation.quantised_level`, checked against a mixed-integer programme in `tests/`) |
+| t1 | Theorem 1(b): under LXB-ES, \|V_j − x_j\| ≤ v_j^max/2 | share of equal-split regulator-days within the bound, with V̂ and with V |
+| t2 | Theorem 2: 0 ≤ Π_ind ≤ Σq_j/ΣD_j, Π_ind = 0 ⇔ λ\* D_j ≥ q_j for every regulator; λ_q − Σv_j/D_6 ≤ λ_v ≤ λ_q; V < Σq_j^min forces a dry outlet | daily λ\*, minimum-delivery level λ_q and Π_ind = λ\* − λ_q of the node from the operating records (exact breakpoint algorithm of `quantmaxmin.allocation.quantised_level`, checked against a mixed-integer programme in `tests/`), and the whole-step level λ_v at the lower and upper operating level (`whole_step_level`, checked by enumeration) |
+| node | balance of the six outlets | surplus of the regulators over their plans, satisfaction of the barrier against its plan on the deficit days, storage change of the pool, seasonal delivery over the plan of every outlet |
 | t3 | Theorem 3: in the pulse regime the θ rule gives x̃_j − θ min{p_j^max, x̃_j} ≤ V_j < x̃_j + p_j^max | bounds on the regulator-days with pulses only, with V̂ and with V |
 | t4 | Theorem 4: −p_j^max < e_j(s) ≤ θ p_j^max for the carry-over debt; period error \|ΣV_j − Σx_j\|/ΣD_j for T = 1, 10, 30 days and the season | debt recursion reconstructed from x_j and V̂_j; period errors of LXB-CO against LXB-T050 |
-| rules | outcome of every rule | mean and minimum daily λ, days with λ = 0, regulator-days with r_j = 0, shortfall and over-delivery of the regulators, seasonal satisfaction and ten-day error of R-1 with V and with V̂ |
+| rules | outcome of every rule | mean and minimum daily λ, days with λ = 0, regulator-days with r_j = 0, shortfall and over-delivery of the regulators, seasonal satisfaction of R-1, error of R-1 over the calendar dekads (mean, median, 95th percentile, largest) with V and with V̂, days of R-1 by execution mode, gate movements (from `scripts/gate_activity.py`) |
 | device | device chain against the quantised actuator alone | pulse days on which the executed open steps differ from the commanded pulses by one or two (a lost command packet), the error of V̂ against V, equal-split days outside half a resolution step |
 
 Tolerances: 10⁻⁶ m³ for volumes, 10⁻¹² for levels of satisfaction.

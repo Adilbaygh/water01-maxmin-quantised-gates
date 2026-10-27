@@ -1,4 +1,4 @@
-# Theorem 1(b): equal split, |V - x| <= g_max / 2
+# Theorem 1(b): equal split, |V - x| <= v_max / 2
 
 | case | es_regulator_days | within_half_step_est | within_half_step_true | max_err_over_half_step_est | max_err_over_half_step_true | mean_abs_err_m3 | mean_abs_err_T050_same_days_m3 |
 |---|---|---|---|---|---|---|---|

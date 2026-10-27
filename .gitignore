@@ -25,6 +25,7 @@
 !/scripts/verification_convergence.py
 !/scripts/verification_pulse.py
 !/scripts/check_swmm_benchmark.py
+!/scripts/gate_activity.py
 # input data: the processed operating records and the NASA POWER files are public; the original record sheets stay
 # local
 !/DATA/

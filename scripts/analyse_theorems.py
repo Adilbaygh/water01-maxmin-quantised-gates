@@ -3,14 +3,18 @@ indivisibility of the Kegeyli node (Theorem 2). Writes results/analysis/*.csv an
 
 Parts:
   quanta  step volumes of the regulators at three levels and the conditions of Theorem 1(b).
-  t1  Theorem 1(a): predicted exclusion (0 < x < (1 - 1/(2k)) q_min) against regulator-days without water under floor
-      rounding (LXB), for the deadband, discharge-coefficient and leakage cases; Theorem 1(b): equal-split error.
-  t2  Theorem 2: daily lambda*, lambda_q and Pi_ind of the node from the operating records (quanta at the upper
-      operating level and at the daily maximum level of the run).
+  t1  Theorem 1(a): predicted exclusion (0 < x < (1 - 1/(2k)) q_min) against regulator-days without water under direct
+      execution (LXB), for the deadband, discharge-coefficient and leakage cases; Theorem 1(b): equal-split error.
+  t2  Theorem 2: daily lambda*, minimum-delivery level lambda_q and Pi_ind of the node from the operating records
+      (quanta at the upper operating level and at the daily maximum level of the run), and the whole-step level
+      lambda_v at the levels of the operating range in steps of 1 cm with the bound of Theorem 2(c).
+  node  balance of the six outlets by rule: surplus of the regulators, satisfaction of the barrier against lambda*,
+      change of storage of the pool.
   t3  Theorem 3: bounds of the theta pulse rule on regulator-days in the pulse regime.
   t4  Theorem 4: debt bounds of the carry-over rule and accounting-period errors for T = 1, 10, 30 days and the season.
-  rules  outcome of every rule (daily worst-case satisfaction, outlet-days without water, shortfall, over-delivery).
-Usage: python scripts/analyse_theorems.py [--parts quanta,t1,t2,t3,t4,rules]
+  rules  outcome of every rule (daily worst-case satisfaction, outlet-days without water, shortfall, over-delivery,
+      error of R-1 over calendar dekads, days by execution mode, gate activity from scripts/gate_activity.py).
+Usage: python scripts/analyse_theorems.py [--parts quanta,t1,t2,node,t3,t4,rules,device]
 """
 import argparse
 import math
@@ -23,7 +27,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analysis_common import (OUT, REGULATORS, YEARS, Quanta, available, load, markdown, node_water,
                              regulator_days)
-from quantmaxmin.allocation import continuous_level, quantised_level
+from quantmaxmin.allocation import continuous_level, quantised_level, whole_step_level
 
 THETA = {"LXB-T000": 0.0, "LXB-T025": 0.25, "LXB-T050": 0.5, "LXB-T075": 0.75, "LXB-ES": 0.5, "LXB-CO": 0.5}
 CASE_SCENARIO = {"phys": "normal", "q_main": "normal", "q_theta": "normal", "iot_main": "normal",
@@ -57,18 +61,18 @@ def part_quanta():
              "resolution_step_mm": 1e3 * qa.res * qa.amax[j], "k": qa.k,
              "smallest_opening_mm": 1e3 * qa.k * qa.res * qa.amax[j]}
         for tag, h in (("lo", h_lo), ("norm", h_no), ("hi", h_hi)):
-            r[f"g_{tag}_m3"] = float(qa.g(h)[j]); r[f"q_{tag}_m3"] = float(qa.q(h)[j])
+            r[f"v_{tag}_m3"] = float(qa.v(h)[j]); r[f"q_{tag}_m3"] = float(qa.q(h)[j])
             r[f"p_{tag}_m3"] = float(qa.p(h)[j])
         r["C_step_lo_m3"] = float(c_step[j])
-        r["C_ge_2q_3g"] = bool(c_step[j] >= 2 * r["q_hi_m3"] + 3 * r["g_hi_m3"])
-        r["es_upper_limit_m3"] = float(math.ceil(N / 2) * (c_step[j] - r["g_hi_m3"]))
+        r["C_ge_2q_3v"] = bool(c_step[j] >= 2 * r["q_hi_m3"] + 3 * r["v_hi_m3"])
+        r["es_upper_limit_m3"] = float(math.ceil(N / 2) * (c_step[j] - r["v_hi_m3"]))
         rows.append(r)
     df = pd.DataFrame(rows)
     # daily demands of the season (baseline demand file, eta = 0.81)
     _, _, D = node_water(2010)
     df["D_min_m3"] = D[:5].min(axis=1); df["D_max_m3"] = D[:5].max(axis=1)
     df["D_min_over_q_lo"] = df["D_min_m3"] / df["q_lo_m3"]
-    save(df, "step_volumes", "Step volumes of the regulators (one resolution step g, quantum q = k g, pulse p = (k + 1) g; "
+    save(df, "step_volumes", "Step volumes of the regulators (one resolution step v, quantum q = k v, pulse p = (k + 1) v; "
          "levels: lo = lower operating level, norm = normal level, hi = upper operating level)")
 
 
@@ -106,7 +110,7 @@ def part_t1():
                      "max_V_predicted_m3": float(rd["V"][predicted].max()) if predicted.any() else np.nan,
                      "max_x_over_qmin_predicted": float((rd["x"] / rd["q_min"])[predicted].max()) if predicted.any()
                      else np.nan})
-    save(pd.DataFrame(rows), "theorem1a_exclusion", "Theorem 1(a): exclusion under floor rounding (LXB)")
+    save(pd.DataFrame(rows), "theorem1a_exclusion", "Theorem 1(a): exclusion under direct execution (LXB)")
     rows = []
     for case in ("q_main", "iot_main"):
         df = load(case, "LXB-ES")
@@ -116,7 +120,7 @@ def part_t1():
         rd = regulator_days(df, qa)
         es = rd["mode"] == "ES"
         err_hat = (rd["Vhat"] - rd["xt"]).abs()[es]; err = (rd["V"] - rd["xt"]).abs()[es]
-        half = rd["g_max"][es] / 2; half_e = rd["g_max_est"][es] / 2
+        half = rd["v_max"][es] / 2; half_e = rd["v_max_est"][es] / 2
         rows.append({"case": case, "es_regulator_days": int(es.sum()),
                      "within_half_step_est": int((err_hat <= half_e + 1e-6).sum()),
                      "within_half_step_true": int((err <= half + 1e-6).sum()),
@@ -124,7 +128,7 @@ def part_t1():
                      "max_err_over_half_step_true": float((err / half).max()) if es.any() else np.nan,
                      "mean_abs_err_m3": float(err.mean()) if es.any() else np.nan,
                      "mean_abs_err_T050_same_days_m3": mean_err_same_days(case, rd[es])})
-    save(pd.DataFrame(rows), "theorem1b_equal_split", "Theorem 1(b): equal split, |V - x| <= g_max / 2")
+    save(pd.DataFrame(rows), "theorem1b_equal_split", "Theorem 1(b): equal split, |V - x| <= v_max / 2")
 
 
 def mean_err_same_days(case, es_days):
@@ -141,8 +145,12 @@ def mean_err_same_days(case, es_days):
 def part_t2():
     qa = Quanta("normal")
     h_hi = float(qa.cfg.params["H_max_m"].value) - float(qa.cfg.freeboard_m)
+    h_lo = float(qa.cfg.params["h_min_operating_m"].value)
     q_hi = np.r_[qa.q(h_hi), 0.0]                                 # check structure: no quantum
-    q_lo = np.r_[qa.q(float(qa.cfg.params["h_min_operating_m"].value)), 0.0]
+    q_lo = np.r_[qa.q(h_lo), 0.0]
+    v_hi = np.r_[qa.v(h_hi), 0.0]; v_lo = np.r_[qa.v(h_lo), 0.0]   # one resolution step (whole-step grid)
+    grid_levels = np.round(np.arange(h_lo, h_hi + 1e-9, 0.01), 2)  # operating range in steps of 1 cm
+    grid_qv = [(np.r_[qa.q(h), 0.0], np.r_[qa.v(h), 0.0]) for h in grid_levels]
     rows = []
     ref = {y: load("q_main", "LXB-T050", (y,)) for y in YEARS}
     for y in YEARS:
@@ -153,14 +161,47 @@ def part_t2():
             lam = continuous_level(A[p], D[:, p])
             lq = quantised_level(A[p], D[:, p], q_hi)
             lq_day = quantised_level(A[p], D[:, p], q_day)
+            lv_hi = whole_step_level(A[p], D[:, p], q_hi, v_hi) if A[p] > 0 else 0.0
+            lv_lo = whole_step_level(A[p], D[:, p], q_lo, v_lo) if A[p] > 0 else 0.0
+            lv_all = [whole_step_level(A[p], D[:, p], q, v) for q, v in grid_qv] if A[p] > 0 else [0.0]
+            lv_range = min(lv_all)
+            ok_range = all(lv <= quantised_level(A[p], D[:, p], q) + 1e-12
+                           and lv >= quantised_level(A[p], D[:, p], q) - v.sum() / D[5, p] - 1e-12
+                           for lv, (q, v) in zip(lv_all, grid_qv)) if A[p] > 0 else True
             rows.append({"year": y, "date": d.date(), "V_m3": A[p], "sumD_m3": D[:, p].sum(), "lambda_star": lam,
                          "lambda_q": lq, "Pi_ind": lam - lq, "Pi_ind_day_level": lam - quantised_level(
                              A[p], D[:, p], q_day), "bound_sum_q_over_sum_D": q_hi.sum() / D[:, p].sum(),
                          "R1_demand_below_quantum": bool(D[1, p] < q_hi[1]), "lambda_q_day": lq_day,
-                         "sum_qmin_exceeds_V": bool(A[p] < q_lo.sum())})
+                         "sum_qmin_exceeds_V": bool(A[p] < q_lo.sum()),
+                         "lambda_v_hi": lv_hi, "lambda_v_lo": lv_lo, "lambda_v_min_range": lv_range,
+                         "bracket_ok_range": bool(ok_range),
+                         "bound_steps_hi": v_hi.sum() / D[5, p], "lambda_q_lo": quantised_level(A[p], D[:, p], q_lo)})
     daily = pd.DataFrame(rows)
     OUT.mkdir(parents=True, exist_ok=True)
     daily.to_csv(OUT / "theorem2_daily.csv", index=False)
+    sup = daily[daily["V_m3"] > 0]; defi = sup[sup["lambda_star"] < 1]
+    gap_hi = sup["lambda_star"] - sup["lambda_v_hi"]; gap_lo = sup["lambda_star"] - sup["lambda_v_lo"]
+    bracket = ((sup["lambda_v_hi"] <= sup["lambda_q"] + 1e-12)
+               & (sup["lambda_v_hi"] >= sup["lambda_q"] - sup["bound_steps_hi"] - 1e-12))
+    gap_range = sup["lambda_star"] - sup["lambda_v_min_range"]
+    ws = pd.DataFrame([{"supply_days": int(len(sup)), "deficit_days_with_supply": int(len(defi)),
+                        "levels": int(len(grid_levels)), "level_step_m": 0.01,
+                        "max_gap_range": float(gap_range.max()),
+                        "no_deficit_days_lambda_v_below_1_range": int(((sup["lambda_star"] >= 1)
+                                                                       & (sup["lambda_v_min_range"] < 1)).sum()),
+                        "max_gap_hi": float(gap_hi.max()), "max_gap_lo": float(gap_lo.max()),
+                        "mean_gap_hi": float(gap_hi.mean()), "days_gap_pos_hi": int((gap_hi > 1e-12).sum()),
+                        "no_deficit_days_lambda_v_below_1": int(((sup["lambda_star"] >= 1) & (sup["lambda_v_hi"] < 1)
+                                                                 ).sum()),
+                        "max_bound_steps_deficit": float(defi["bound_steps_hi"].max()),
+                        "max_bound_steps_supply": float(sup["bound_steps_hi"].max()),
+                        "bracket_holds_days": int(bracket.sum()),
+                        "bracket_holds_days_range": int(sup["bracket_ok_range"].sum()),
+                        "max_Pi_lo": float((sup["lambda_star"] - sup["lambda_q_lo"]).max()),
+                        "sum_v_hi_m3": float(v_hi.sum()), "sum_v_lo_m3": float(v_lo.sum())}])
+    save(ws, "theorem2_whole_steps", "Theorem 2(c): whole-step level lambda_v of the node against lambda* at the levels of "
+         "the operating range in steps of 1 cm (range), at its upper (hi) and lower (lo) end, and the bound "
+         "lambda_q - sum v / D_barrier (days with supply)")
     summ = daily.groupby("year").agg(days=("date", "size"), deficit_days=("lambda_star", lambda s: int((s < 1).sum())),
                                      Pi_pos_days=("Pi_ind", lambda s: int((s > 1e-12).sum())),
                                      Pi_max=("Pi_ind", "max"), Pi_mean=("Pi_ind", "mean"),
@@ -177,6 +218,50 @@ def part_t2():
          "Theorem 2: price of indivisibility of the Dustlik node (quanta at the upper operating level)")
 
 
+# Node balance --------------------------------------------------------------------------------------------------------
+def part_node():
+    """Balance of the six outlets of the node by rule: daily surplus of the five regulators over their plans, which the
+    barrier (no quantum, the rest of the inflow) gives up; satisfaction of the barrier against lambda* on the deficit days;
+    storage change of the pool, W - sum of the six deliveries; seasonal delivery over the plan for every outlet."""
+    from water01.domain.passport import USERS
+    W = pd.concat([pd.DataFrame({"date": node_water(y)[0], "W": node_water(y)[1]}) for y in YEARS], ignore_index=True)
+    rows = []
+    for case, methods in (("phys", ("LXB",)), ("q_main", ("LXB", "LXB-T000", "LXB-T050", "LXB-ES", "LXB-CO")),
+                          ("q_theta", ("LXB-T025", "LXB-T075")),
+                          ("iot_main", ("LXB", "LXB-T000", "LXB-T050", "LXB-ES", "LXB-CO"))):
+        for m in methods:
+            df = load(case, m)
+            if df.empty:
+                continue
+            d = df.merge(W, on="date", how="left")
+            sup = d["W"] > 0
+            bar = USERS[5]
+            sumD = sum(d[f"D_{u}"] for u in USERS)
+            defi = sup & (d["W"] < sumD)                         # deficit day of the recorded supply, lambda* < 1
+            plan_ratio = d[f"x_{bar}"] / d[f"D_{bar}"]           # planned satisfaction of the barrier (= lambda*)
+            surplus = sum(d[f"V_{u}"] - d[f"x_{u}"] for u in USERS[:5])
+            ds = d["W"] - sum(d[f"V_{u}"] for u in USERS)
+            dev = d[f"r_{bar}"] - plan_ratio
+            r = {"case": case, "rule": m, "supply_days": int(sup.sum()), "deficit_days": int(defi.sum()),
+                 "regulator_surplus_mean_m3": float(surplus[sup].mean()), "regulator_surplus_max_m3": float(surplus[sup].max()),
+                 "regulator_surplus_max_over_D6_deficit": float((surplus / d[f"D_{bar}"])[defi].max()),
+                 "barrier_r_minus_lambda_mean_deficit": float(dev[defi].mean()),
+                 "barrier_r_minus_lambda_min_deficit": float(dev[defi].min()),
+                 "barrier_r_minus_lambda_max_deficit": float(dev[defi].max()),
+                 "barrier_below_lambda_by_1e3_days": int((dev[defi] < -1e-3).sum()),
+                 "storage_change_over_W_mean": float((ds / d["W"])[sup].mean()),
+                 "storage_change_over_W_min": float((ds / d["W"])[sup].min()),
+                 "storage_change_over_W_max": float((ds / d["W"])[sup].max()),
+                 "lambda_mean_deficit": float(d["lambda"][defi].mean()),
+                 "lambda_star_mean_deficit": float((d["W"] / sumD)[defi].mean()),
+                 "plan_ratio_minus_lambda_star_max_abs_deficit": float((plan_ratio - d["W"] / sumD)[defi].abs().max())}
+            for u in USERS:
+                r[f"V_over_x_{u}"] = float(d[f"V_{u}"].sum() / d[f"x_{u}"].sum())
+            rows.append(r)
+    save(pd.DataFrame(rows), "node_balance", "Balance of the six outlets by rule (sums over the stored seasons; the "
+         "barrier on the deficit days of the recorded supply, its satisfaction against its planned satisfaction)")
+
+
 # Theorem 3 -----------------------------------------------------------------------------------------------------------
 def part_t3():
     rows = []; viol = []
@@ -190,7 +275,8 @@ def part_t3():
             if df.empty:
                 continue
             th = THETA[m]
-            rd = regulator_days(df, qa)
+            rd = regulator_days(df, qa).sort_values(["user", "date"])
+            rd["prev_open_all_day"] = (rd.groupby(["user", "year"])["open"].shift(1) == round(86400 / qa.dt))
             pure = (rd["pulses"] > 0) & (rd["open"] == rd["pulses"]) & (rd["esopen"] == 0) & (rd["xt"] > EPS)
             r = rd[pure]
             for vol in ("Vhat", "V"):
@@ -210,6 +296,9 @@ def part_t3():
                 rows.append({"case": case, "rule": m, "theta": th, "volume": vol, "pulse_regime_days": int(pure.sum()),
                              "lower_bound_holds": int(ok_lo.sum()), "upper_bound_holds": int(ok_up.sum()),
                              "days_x_ge_p": int(big.sum()), "sharp_upper_bound_holds": int(ok_sh.sum()),
+                             "sharp_violations_after_day_open_throughout": int((~ok_sh & r["prev_open_all_day"]).sum()),
+                             "sharp_max_excess_over_p": float(((r[vol] - upper_sharp) / r[pcol]).clip(lower=0).max())
+                             if len(r) else 0.0,
                              "max_lower_violation_m3": float((lower - r[vol]).clip(lower=0).max()) if len(r) else 0.0,
                              "max_upper_violation_m3": float((r[vol] - upper).clip(lower=0).max()) if len(r) else 0.0,
                              "max_lower_violation_over_p": float(((lower - r[vol]).clip(lower=0) / r[pcol]).max())
@@ -347,7 +436,7 @@ def part_t4():
 # Device chain -----------------------------------------------------------------------------------------------------------
 def part_device():
     """Execution under the device chain against the quantised actuator alone: pulse days on which the executed open
-    steps differ from the commanded pulses by one or two (a command packet lost: (A3) violated), the error of the
+    steps differ from the commanded pulses by one or two (a command packet lost: assumption (H4) of the article violated), the error of the
     estimated volume against the plant, and equal-split days outside half a resolution step."""
     rows = []
     for case in ("q_main", "iot_main"):
@@ -363,7 +452,7 @@ def part_device():
             lost = cand & diff.abs().between(1, 2)
             e_lost = ((rd["V"] - rd["xt"]) / rd["p_max"])[lost]
             es = rd["mode"] == "ES"
-            half_e = rd["g_max_est"] / 2
+            half_e = rd["v_max_est"] / 2
             es_out = es & ((rd["Vhat"] - rd["xt"]).abs() > half_e + 1e-6)
             step = rd["xt"] / rd["m"].where(rd["m"] > 0)
             e_es = ((rd["Vhat"] - rd["xt"]).abs() / step)[es_out]
@@ -385,7 +474,19 @@ def part_device():
          "pulse days, estimated against plant volumes, equal-split days outside half a resolution step")
 
 # Rules ---------------------------------------------------------------------------------------------------------------
+def dekad_errors(df, vol):
+    """|sum V - sum x| / sum D of R-1 over the calendar dekads (days 1-10, 11-20 and 21 to the end of the month; the
+    season of 183 days has 18 of them)."""
+    d = pd.DatetimeIndex(df["date"])
+    key = d.year * 1000 + d.month * 10 + np.where(d.day <= 10, 0, np.where(d.day <= 20, 1, 2))
+    g = pd.DataFrame({"k": key, "V": df[f"{vol}_R-1"].to_numpy(), "x": df["x_R-1"].to_numpy(),
+                      "D": df["D_R-1"].to_numpy()}).groupby("k").sum()
+    return ((g["V"] - g["x"]).abs() / g["D"]).to_numpy()
+
+
 def part_rules():
+    act = OUT / "gate_activity.csv"
+    activity = pd.read_csv(act).set_index("method") if act.exists() else None
     rows = []
     for case, methods in (("phys", ("LXB",)), ("q_main", ("LXB", "LXB-T000", "LXB-T050", "LXB-ES", "LXB-CO")),
                           ("q_theta", ("LXB-T025", "LXB-T075")),
@@ -414,7 +515,21 @@ def part_rules():
                 e10.extend(np.abs(V - x) / D); e10_est.extend(np.abs(Vh - x) / D)
             seas_est = df.groupby("year")[[f"Vhat_{u}" for u in REGULATORS]].sum()
             sat = pd.DataFrame({u: seas[f"V_{u}"] / seas[f"D_{u}"] for u in REGULATORS})
-            rows.append({"case": case, "rule": m, "seasons": int(df["year"].nunique()), "days": int(len(df)),
+            dk = dekad_errors(df, "V"); dk_est = dekad_errors(df, "Vhat")
+            pos = df["x_R-1"] > EPS
+            extra = {"R1_dekads": int(dk.size), "R1_dekad_err_mean": float(dk.mean()),
+                     "R1_dekad_err_median": float(np.median(dk)), "R1_dekad_err_p95": float(np.quantile(dk, 0.95)),
+                     "R1_dekad_err_max": float(dk.max()), "R1_dekad_err_mean_est": float(dk_est.mean()),
+                     "R1_days_plan_pos": int(pos.sum()),
+                     "R1_days_mode_ES": int((pos & (df["mode_R-1"] == "ES")).sum()),
+                     "R1_days_mode_PULSE": int((pos & (df["mode_R-1"] == "PULSE")).sum()),
+                     "R1_days_mode_LP": int((pos & (df["mode_R-1"] == "LP")).sum())}
+            if activity is not None and case == "q_main" and m in activity.index:
+                a = activity.loc[m]
+                extra.update({"gate_moves_per_regulator_day": float(a["moves_per_day"]),
+                              "gate_moves_per_day_R1": float(a["moves_R-1"]),
+                              "gate_travel_per_regulator_day": float(a["travel_per_day"])})
+            rows.append({**extra, "case": case, "rule": m, "seasons": int(df["year"].nunique()), "days": int(len(df)),
                          "mean_daily_lambda": float(lam.mean()), "min_daily_lambda": float(lam.min()),
                          "days_lambda_zero": int((lam <= EPS).sum()),
                          "regulator_days_r_zero": int((r <= EPS).sum().sum()),
@@ -433,11 +548,11 @@ def part_rules():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--parts", default="quanta,t1,t2,t3,t4,rules,device")
+    ap.add_argument("--parts", default="quanta,t1,t2,node,t3,t4,rules,device")
     a = ap.parse_args()
     for part in a.parts.split(","):
-        {"quanta": part_quanta, "t1": part_t1, "t2": part_t2, "t3": part_t3, "t4": part_t4, "rules": part_rules,
-         "device": part_device}[part]()
+        {"quanta": part_quanta, "t1": part_t1, "t2": part_t2, "node": part_node, "t3": part_t3, "t4": part_t4,
+         "rules": part_rules, "device": part_device}[part]()
 
 
 if __name__ == "__main__":
