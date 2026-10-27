@@ -15,11 +15,9 @@ jobs:
           cache: pip
       - name: Install the pinned environment
         run: python -m pip install -r requirements.txt
-      - name: Run the tests on the synthetic inputs
+      - name: Run the tests (theory, rules in closed loop, simulation core)
         run: python -m pytest -q
-      - name: Check the stored results (completeness, code and input checksums, manifest)
-        run: python scripts/check_results.py --all
-      - name: Regenerate the tables of the article from the stored results
+      - name: Recompute the summary tables and the figures from the stored runs
         run: |
-          python scripts/make_results_tables.py
-          python scripts/fig_results.py
+          python scripts/analyse_theorems.py
+          python scripts/make_figures.py

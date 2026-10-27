@@ -1,5 +1,0 @@
-meta:
-  name: supply_ramp
-  description: "Sensitivity: within the day, supply changes linearly over 6 h from the previous daily value; the controller is not informed"
-overrides:
-  supply_ramp_hours: {value: 6.0, status: assumed, source: "intraday supply change is not recorded in the daily data"}

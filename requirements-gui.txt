@@ -1,3 +1,0 @@
-# Graphical interface (app/water01_app.py); install together with requirements.txt
-streamlit>=1.50,<2
-plotly>=5.20

@@ -1,5 +1,0 @@
-meta:
-  name: gate_head_h0
-  description: "Exploratory: gate law with a ten times smaller smoothing scale of the square-root head term (h0 = 0.1 mm instead of 1 mm), closer to the positive-part form of Equation (6)"
-overrides:
-  gate_head_regularisation_m: {value: 1.0e-4, status: setting, source: "softplus scale of sqrt(head+), sensitivity of the zero-head regularisation"}

@@ -83,7 +83,7 @@ def load_demand(path, variant="A"):
         raise ValueError(f"Variant {variant} not found")
     # unit check: volume = discharge × days × 86400
     days = out.apply(lambda r: 10 if r.decade < 3 else calendar.monthrange(2021, int(r.month))[1] - 20, axis=1)
-    if not np.allclose(out.D_mln_m3, out.q_mean_m3s * days * SECONDS_PER_DAY / 1e6, rtol=2e-3, atol=1e-3):
+    if not np.allclose(out.D_mln_m3, out.q_mean_m3s * days * SECONDS_PER_DAY / 1e6, rtol=1e-9, atol=0.0):
         raise ValueError("Demand volume and discharge are inconsistent")
     return out.reset_index(drop=True)
 
@@ -121,17 +121,26 @@ def iot_scenario(cfg, factors=IOT_FACTORS, sensor=None):
     unknown = factors - set(IOT_FACTORS)
     if unknown:
         raise ValueError(f"Unknown factor: {sorted(unknown)}")
+    from ..domain.config import optional
     dev = devices()[sensor or cfg.sensor]
     kw = {}
     if "sensor" in factors:
-        from ..domain.config import optional
         kw.update(sensor_accuracy_m=dev.accuracy_m, sensor_resolution_m=dev.resolution_m,
-                  sensor_bias_m=float(optional("sensor_bias_m", 0.0)))
+                  sensor_bias_m=float(optional("sensor_bias_m", 0.0)),
+                  sensor_drift_m_per_day=float(optional("sensor_drift_m_per_day", 0.0)))
     if "quantisation" in factors:
         kw.update(gate_resolution=cfg.gate_resolution_fraction, gate_deadband=cfg.gate_deadband_fraction)
     if "communication" in factors:
         kw.update(message_window_steps=cfg.message_window_steps, message_budget=cfg.message_budget_per_window,
                   loss_probability=cfg.loss_probability)
+        # stress options of the link (scenario additions; inactive by default)
+        for name in ("uplink_loss_probability", "channel_burst_fraction", "command_delay_probability",
+                     "backhaul_outage_rate_per_day", "backhaul_outage_mean_hours"):
+            kw[name] = float(optional(name, 0.0))
+        kw["channel_burst_mean_steps"] = float(optional("channel_burst_mean_steps", 1.0))
     if "energy" in factors:
         kw.update(energy=True)
+        # stress option of the energy factor: mains outages of the gate drives (inactive by default)
+        for name in ("grid_outage_rate_per_day", "grid_outage_mean_hours"):
+            kw[name] = float(optional(name, 0.0))
     return IoTConfig(estimator_blend=cfg.estimator_blend, **kw)

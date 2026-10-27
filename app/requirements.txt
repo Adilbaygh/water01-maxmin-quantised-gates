@@ -1,3 +1,0 @@
-# Used by Streamlit Community Cloud when the interface is deployed from this repository
--r ../requirements.txt
--r ../requirements-gui.txt

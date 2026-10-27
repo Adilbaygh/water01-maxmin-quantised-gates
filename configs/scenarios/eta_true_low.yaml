@@ -1,5 +1,0 @@
-meta:
-  name: eta_true_low
-  description: "Sensitivity (plant/controller mismatch): the plant loses more water (eta = 0.75) than the controller assumes (0.82); demand unchanged"
-additions:
-  eta_true: {value: 0.75, status: assumed, source: "lower quartile of the 2020 steady days; plant only, the controller keeps eta"}

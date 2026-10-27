@@ -1,5 +1,0 @@
-meta:
-  name: sensor_bias_pos
-  description: "Sensitivity (IoT layer): persistent level-sensor offset +0.025 m (calibration error) in addition to the random error"
-additions:
-  sensor_bias_m: {value: 0.025, status: assumed, source: "datasheet accuracy class of EM500-SWL as a constant offset"}

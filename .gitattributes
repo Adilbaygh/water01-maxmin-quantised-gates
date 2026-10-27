@@ -1,4 +1,4 @@
 # Files are stored and checked out byte for byte (no line-ending conversion): the SHA-256 checksums of the
-# protocol, the inputs and the results (results/experiment/MANIFEST_all.json and every .meta.json) refer to the
+# simulation core (docs/CORE_MANIFEST.sha256), of the inputs and of the results (every .meta.json) refer to the
 # exact bytes of the files.
 * -text

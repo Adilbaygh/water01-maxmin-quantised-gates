@@ -76,16 +76,33 @@ class PreissmannSolver:
         (cells i−1 and i, boundary conditions), so columns j and j+4 never share a row. Each column derivative is
         taken only from these rows (a wider window would mix in the effect of the neighbouring column)."""
         n = z.size; ab = np.zeros((5, n))
+        maps = self._band_maps(n)
         for c in range(4):
-            cols = np.arange(c, n, 4)
+            cols, rows, band, owner = maps[c]
             dz = self.fd_step * np.maximum(1.0, np.abs(z[cols]))
             zp = z.copy(); zp[cols] += dz
             dF = (self.residual(zp, *args) - F0)
-            for j, d in zip(cols, dz):
+            ab[band, owner] = dF[rows] / dz[np.searchsorted(cols, owner)]
+        return ab
+
+    def _band_maps(self, n):
+        """For each colour: its columns and, for every (row, column) pair in the window of a column, the row, the
+        band index and the column (the same entries as the column-by-column loop of the finite differences)."""
+        cache = getattr(self, "_maps", None)
+        if cache is not None and cache[0] == n:
+            return cache[1]
+        maps = []
+        for c in range(4):
+            cols = np.arange(c, n, 4)
+            rows, band, owner = [], [], []
+            for j in cols:
                 i = j // 2
                 lo, hi = max(0, 2 * i - 1), min(n, 2 * i + 3)
-                ab[2 + np.arange(lo, hi) - j, j] = dF[lo:hi] / d
-        return ab
+                r = np.arange(lo, hi)
+                rows.append(r); band.append(2 + r - j); owner.append(np.full(r.size, j))
+            maps.append((cols, np.concatenate(rows), np.concatenate(band), np.concatenate(owner)))
+        self._maps = (n, maps)
+        return maps
 
     def _advance(self, dt):
         """One internal (Newton) step. Raises RuntimeError if it does not converge."""

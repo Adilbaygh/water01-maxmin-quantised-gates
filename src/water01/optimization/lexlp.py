@@ -10,13 +10,39 @@ Two levels:
   constraint (9), level bounds and gate-rate constraints (closed loop, simulation.plant_loop).
 """
 import numpy as np
-from scipy.optimize import linprog
-from scipy.sparse import coo_matrix, lil_matrix, vstack
+from scipy.optimize import OptimizeResult, linprog
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, lil_matrix, vstack
 
 from ..domain.passport import optional, value
 from .constraints import daily_balance, effective_supply, retained_bounds, variable_bounds
 from .objectives import (satisfaction, var_index, variation_links, variation_rows, weighted_satisfaction_coeffs,
                          worst_case_rows)
+
+
+def _cache_highs_option_checks():
+    """SciPy's HiGHS wrapper validates every option of every solve by constructing a new HiGHS options manager, which
+    costs several milliseconds per solve. The validation depends only on the option name and value, so its result is
+    cached; the options passed to the solver, and therefore the solutions, are unchanged."""
+    try:
+        from scipy.optimize._highspy import _highs_wrapper as wrapper
+    except ImportError:                                         # other SciPy layout: no caching
+        return
+    original = getattr(wrapper, "check_option", None)
+    if original is None or getattr(original, "cached", False):
+        return
+    cache = {}
+
+    def check_option(highs_inst, option, value):
+        key = (option, type(value).__name__, repr(value))
+        if key not in cache:
+            cache[key] = original(highs_inst, option, value)
+        return cache[key]
+
+    check_option.cached = True
+    wrapper.check_option = check_option
+
+
+_cache_highs_option_checks()
 
 
 # HiGHS tolerances (default 1e-7). Secondary objectives (smooth discharge, gate movement) can differ by less than
@@ -29,12 +55,84 @@ def lp_options():
 
 
 FALLBACKS = {"count": 0}
+COLD_RESTARTS = {"count": 0}        # warm-started solves repeated from scratch (diagnostic, written to the results)
+
+try:                                # HiGHS bindings shipped with SciPy (the solver behind linprog(method="highs"))
+    from scipy.optimize._highspy import _core as _HIGHS
+except ImportError:                 # other SciPy layout: every LP is solved with linprog
+    _HIGHS = None
+
+# Simplex basis of the last optimal solve of each LP (call site and dimensions). Consecutive LPs of a run differ only
+# in their data, so the previous optimal basis is a good starting point for the dual simplex method; it changes the
+# number of iterations, not the optimality conditions. The bases are cleared at the start of every run
+# (reset_warm_start), so that the solutions of a run do not depend on the runs solved before it in the same process.
+_WARM = {}
 
 
-def _lp(c, **kw):
-    """HiGHS: first with tight tolerances (configuration); if no solution is returned (e.g. status "Unknown", a
-    numerical issue), the default tolerances are tried, then the interior-point method. Uses of the fallback path
-    are counted in FALLBACKS (written to the results file)."""
+def reset_warm_start():
+    """Forget the stored simplex bases (called at the start of every closed-loop run)."""
+    _WARM.clear()
+
+
+def _solve_warm(c, tag, A_ub=None, b_ub=None, A_eq=None, b_eq=None, bounds=None):
+    """One dual-simplex solve with HiGHS (tolerances from the configuration, no presolve), started from the stored
+    basis of the same LP when there is one. The model is the one linprog(method="highs") passes to HiGHS: rows of
+    A_ub (≤ b_ub) followed by rows of A_eq (= b_eq). Returns an OptimizeResult, or None if HiGHS did not report an
+    optimal solution."""
+    c = np.asarray(c, float); n = c.size
+    mats, lhs, rhs = [], [], []
+    if A_ub is not None:
+        b = np.asarray(b_ub, float).ravel()
+        mats.append(csr_matrix(A_ub)); lhs.append(np.full(b.size, -np.inf)); rhs.append(b)
+    if A_eq is not None:
+        b = np.asarray(b_eq, float).ravel()
+        mats.append(csr_matrix(A_eq)); lhs.append(b); rhs.append(b)
+    A = csc_matrix(vstack(mats)) if mats else csc_matrix((0, n))
+    A.sort_indices()
+    lo, hi = (np.concatenate(v) if v else np.empty(0) for v in (lhs, rhs))
+    if bounds is None:
+        lb, ub = np.zeros(n), np.full(n, np.inf)
+    else:
+        bd = np.array(bounds, dtype=float).reshape(n, 2)       # None -> NaN -> unbounded
+        lb = np.where(np.isnan(bd[:, 0]), -np.inf, bd[:, 0]); ub = np.where(np.isnan(bd[:, 1]), np.inf, bd[:, 1])
+    m = hi.size
+    h = _HIGHS._Highs()
+    for key, val in (("output_flag", False), ("presolve", "off"), ("solver", "simplex"), ("simplex_strategy", 1),
+                     *lp_options().items()):
+        h.setOptionValue(key, val)
+    lp = _HIGHS.HighsLp()
+    lp.num_col_ = n; lp.num_row_ = m
+    lp.a_matrix_.num_col_ = n; lp.a_matrix_.num_row_ = m
+    lp.a_matrix_.format_ = _HIGHS.MatrixFormat.kColwise
+    lp.col_cost_ = c; lp.col_lower_ = lb; lp.col_upper_ = ub; lp.row_lower_ = lo; lp.row_upper_ = hi
+    lp.a_matrix_.start_ = A.indptr; lp.a_matrix_.index_ = A.indices; lp.a_matrix_.value_ = A.data
+    if h.passModel(lp) == _HIGHS.HighsStatus.kError:
+        return None
+    key = (tag, n, m)
+    if key in _WARM:
+        h.setBasis(_WARM[key])                                  # an unusable basis is rejected by HiGHS
+    h.run()
+    if h.getModelStatus() != _HIGHS.HighsModelStatus.kOptimal:
+        _WARM.pop(key, None)
+        return None
+    _WARM[key] = h.getBasis()
+    info = h.getInfo()
+    return OptimizeResult(x=np.array(h.getSolution().col_value), fun=float(info.objective_function_value),
+                          success=True, status=0, nit=int(info.simplex_iteration_count),
+                          message="Optimization terminated successfully. (HiGHS Status 7: Optimal)")
+
+
+def _lp(c, tag="lp", **kw):
+    """HiGHS dual simplex with tight tolerances (configuration), warm-started from the previous optimal basis of the
+    same LP (_solve_warm); if it does not report an optimal solution, the LP is solved from scratch by
+    linprog(method="highs") with the same tolerances (counted in COLD_RESTARTS), then with the default tolerances,
+    then with the interior-point method. Uses of the last two are counted in FALLBACKS. Both counters are written
+    to the results file."""
+    if _HIGHS is not None:
+        res = _solve_warm(c, tag, **kw)
+        if res is not None:
+            return res
+        COLD_RESTARTS["count"] += 1
     res = linprog(c, method="highs", options=lp_options(), **kw)
     if res.success:
         return res
@@ -106,7 +204,7 @@ def solve_lexicographic(D, A, U=None, weights=None, fixed=None, epsilon_1=None, 
 
     # ---- Stage 1 (11a): max λ, λ ≤ x/D
     G, c1 = worst_case_rows(pairs, D, n, idx)
-    r1 = _check(_lp(c1, A_ub=vstack([G, A1]).tocsr(), b_ub=np.r_[np.zeros(len(pairs)), A_eff],
+    r1 = _check(_lp(c1, "stage1", A_ub=vstack([G, A1]).tocsr(), b_ub=np.r_[np.zeros(len(pairs)), A_eff],
                     bounds=xb + [(0, 1)]), "Stage 1")
     lam = float(r1.x[-1])
     floor = np.where(pos & ~is_fixed, lam - epsilon_1, -np.inf)
@@ -116,7 +214,7 @@ def solve_lexicographic(D, A, U=None, weights=None, fixed=None, epsilon_1=None, 
     if protect_day is not None and any(p == protect_day for _, p in pairs):
         today = [(j, p) for j, p in pairs if p == protect_day]
         Gt, c1b = worst_case_rows(today, D, n, idx)
-        r1b = _check(_lp(c1b, A_ub=vstack([Gt, A1]).tocsr(), b_ub=np.r_[np.zeros(len(today)), A_eff],
+        r1b = _check(_lp(c1b, "stage1b", A_ub=vstack([Gt, A1]).tocsr(), b_ub=np.r_[np.zeros(len(today)), A_eff],
                          bounds=retained_bounds(lb, ub, D, floor) + [(0, 1)]), "Stage 1b")
         mu = float(r1b.x[-1])
         for j, p in today:
@@ -126,7 +224,7 @@ def solve_lexicographic(D, A, U=None, weights=None, fixed=None, epsilon_1=None, 
 
     # ---- Stage 2 (12): max Σ w_j r_{j,p}
     c2 = weighted_satisfaction_coeffs(pairs, D, w, n, idx)
-    r2 = _check(_lp(c2, A_ub=Ab.tocsr(), b_ub=A_eff, bounds=xb2), "Stage 2")
+    r2 = _check(_lp(c2, "stage2", A_ub=Ab.tocsr(), b_ub=A_eff, bounds=xb2), "Stage 2")
     z2 = float(-r2.fun)
 
     if not stage3:                                            # H3 ablation: Stages 1 and 2, without Stage 3
@@ -144,7 +242,7 @@ def solve_lexicographic(D, A, U=None, weights=None, fixed=None, epsilon_1=None, 
     bal = np.zeros((P, nv)); bal[:, :n] = Ab.toarray()
     A3 = np.vstack([np.array(rows), bal])
     b3 = np.r_[rhs, A_eff]
-    r3 = _check(_lp(c3, A_ub=A3, b_ub=b3, bounds=xb2 + [(0, None)] * m), "Stage 3")
+    r3 = _check(_lp(c3, "stage3", A_ub=A3, b_ub=b3, bounds=xb2 + [(0, None)] * m), "Stage 3")
 
     x = r3.x[:n].reshape(J, P)
     _check_retained(x, D, pairs, floor, c2, z2, epsilon_2)
@@ -167,7 +265,7 @@ def solve_weighted_sum(D, A, U=None, weights=None, fixed=None):
         x = lb.copy()
         return {"x": x, "r": satisfaction(x, D)}
     c = weighted_satisfaction_coeffs(pairs, D, w, J * P, var_index(P))
-    res = _check(_lp(c, A_ub=daily_balance(J, P).tocsr(), b_ub=effective_supply(A, lb),
+    res = _check(_lp(c, "weighted", A_ub=daily_balance(J, P).tocsr(), b_ub=effective_supply(A, lb),
                      bounds=[(lb[j, p], ub[j, p]) for j in range(J) for p in range(P)]),
                  "weighted LP")
     x = res.x.reshape(J, P)
@@ -251,38 +349,60 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
     nv = irt + nq
     mu_col = (lambda j: imj + j) if weighted else (lambda j: im)
     qi = lambda j, k: j * K + k
-    R, C, V, b_ub = [], [], [], []
-    ER, EC, EV, b_eq = [], [], [], []
-    row_n = [0]
+    # Constraint rows are assembled block by block with NumPy; the rows and their order are those of the original
+    # row-by-row construction (each row is listed with its local index, its columns, coefficients and right side).
+    blocks_r, blocks_c, blocks_v, blocks_b = [], [], [], []
+    nrow = 0
 
-    def ub(entries, rhs):
-        r = row_n[0]
-        for c_, v_ in entries:
-            R.append(r); C.append(c_); V.append(v_)
-        b_ub.append(rhs); row_n[0] += 1
+    def add(rows_local, cols, vals, rhs):
+        nonlocal nrow
+        rhs = np.atleast_1d(np.asarray(rhs, float))
+        blocks_r.append(np.asarray(rows_local, np.int64) + nrow)
+        blocks_c.append(np.asarray(cols, np.int64))
+        blocks_v.append(np.asarray(vals, float))
+        blocks_b.append(rhs)
+        nrow += rhs.size
+
+    def cat(*parts):
+        return np.concatenate([x if isinstance(x, np.ndarray) else np.array([x]) for x in parts])
 
     q_in = delayed_inflow(q_in_hist, q_in_future, tau, dt, d)
-    # (8) ID model (equality)
-    for k in range(K):
-        ent = [(ih + k, 1.0)] + ([(ih + k - 1, -1.0)] if k > 0 else []) + [(qi(j, k), tau[k] / A_s) for j in range(J)]
-        for c_, v_ in ent:
-            ER.append(k); EC.append(c_); EV.append(v_)
-        b_eq.append(tau[k] / A_s * eta * q_in[k] + (h0 if k == 0 else 0.0))
-    for k in range(K):
-        for j in range(J):                                     # (9)
-            alpha, beta = chord_set[j]
-            if k == 0 and first_limit is not None:
-                ub([(qi(j, 0), 1.0), (isc + qi(j, 0), -1.0)], float(first_limit[j]))
-                continue
-            for a_m, b_m in zip(alpha, beta):
-                if k == 0:
-                    ub([(qi(j, 0), 1.0), (isc + qi(j, 0), -1.0)], a_m + b_m * h0)
-                else:
-                    ub([(qi(j, k), 1.0), (ih + k - 1, -b_m), (isc + qi(j, k), -1.0)], a_m)
-        ub([(ih + k, 1.0), (is_ + k, -1.0)], h_hi)             # level bounds h[k+1]
-        ub([(ih + k, -1.0), (is_ + k, -1.0)], -h_lo)
-        ub([(ih + k, 1.0), (ie + k, -1.0)], h_ref)              # deviation
-        ub([(ih + k, -1.0), (ie + k, -1.0)], -h_ref)
+    jj, kk = np.arange(J), np.arange(K)
+    # (8) ID model (equality): h[k] − h[k−1] + Σ_j (τ_k/A_s) q_j[k] = (τ_k/A_s) η Q_in[k] (+ h0 for k = 0)
+    ER = np.concatenate([kk, kk[1:], np.repeat(kk, J)])
+    EC = np.concatenate([ih + kk, ih + kk[1:] - 1, (jj[None, :] * K + kk[:, None]).ravel()])
+    EV = np.concatenate([np.ones(K), -np.ones(K - 1), np.repeat(tau / A_s, J)])
+    b_eq = tau / A_s * eta * q_in
+    b_eq[0] += h0
+    # (9) chords and level bounds, interval by interval
+    n_chords = [len(chord_set[j][0]) for j in range(J)]
+    alpha = np.concatenate([np.asarray(chord_set[j][0], float) for j in range(J)])
+    beta = np.concatenate([np.asarray(chord_set[j][1], float) for j in range(J)])
+    cj = np.repeat(jj, n_chords)                               # outlet of each chord
+    SM = alpha.size
+    if first_limit is not None:                                # interval 0: exact limit at the known level
+        r = np.arange(J)
+        add(cat(r, r), cat(jj * K, isc + jj * K), cat(np.ones(J), -np.ones(J)), np.asarray(first_limit, float)[:J])
+    else:
+        r = np.arange(SM)
+        add(cat(r, r), cat(cj * K, isc + cj * K), cat(np.ones(SM), -np.ones(SM)), alpha + beta * h0)
+    lvl_rows = np.array([0, 0, 1, 1, 2, 2, 3, 3])
+    lvl_cols = np.array([ih, is_, ih, is_, ih, ie, ih, ie])
+    lvl_vals = np.array([1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0])
+    lvl_rhs = np.array([h_hi, -h_lo, h_ref, -h_ref], float)
+    add(lvl_rows, lvl_cols, lvl_vals, lvl_rhs)
+    if K > 1:                                                  # intervals 1..K−1: SM chord rows, then 4 level rows
+        r = np.arange(SM)
+        ch_rows, ch_cols = cat(r, r, r), cat(cj * K, np.full(SM, ih - 1), isc + cj * K)
+        ch_vals = cat(np.ones(SM), -beta, -np.ones(SM))
+        blk = SM + 4
+        ks = np.arange(1, K)
+        off = (ks - 1) * blk
+        rows = np.concatenate([(off[:, None] + ch_rows[None, :]).ravel(), (off[:, None] + SM + lvl_rows[None, :]).ravel()])
+        cols = np.concatenate([(ks[:, None] + ch_cols[None, :]).ravel(), (ks[:, None] + lvl_cols[None, :]).ravel()])
+        vals = np.concatenate([np.tile(ch_vals, K - 1), np.tile(lvl_vals, K - 1)])
+        rhs = np.concatenate([np.tile(alpha, (K - 1, 1)), np.tile(lvl_rhs, (K - 1, 1))], axis=1).ravel()
+        add(rows, cols, vals, rhs)
     after = K - steps_today
     # μ, ν: volume requirements μ·need ≤ Σ q τ. Each row is divided by max(need, 1 m³): when the remainder is at
     # round-off level (e.g. 2·10⁻¹³ m³), a coefficient 1/need of ~10¹⁵ would cause a HiGHS "Model error".
@@ -292,61 +412,67 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
         raise ValueError("share: 'remaining' or 'final'")
     if final and (delivered_today is None or target_today is None):
         raise ValueError("share='final' requires delivered_today and target_today")
+    ks_today, ks_next = np.arange(steps_today), np.arange(steps_today, K)
     for j in range(J):
         need_today = remaining_today[j]
         if final:                                              # μ·x_j − Σ q τ ≤ V̂_j
             x_j, v_j = float(target_today[j]), float(delivered_today[j])
             if x_j > 0 and steps_today > 0:
                 s_ = max(x_j, 1.0)
-                ub([(qi(j, k), -tau[k] / s_) for k in range(steps_today)] + [(mu_col(j), x_j / s_)], v_j / s_)
+                add(np.zeros(steps_today + 1), cat(j * K + ks_today, mu_col(j)),
+                    cat(-tau[:steps_today] / s_, x_j / s_), v_j / s_)
         elif need_today > 0 and steps_today > 0:
             s_ = max(need_today, 1.0)
-            ub([(qi(j, k), -tau[k] / s_) for k in range(steps_today)] + [(mu_col(j), need_today / s_)], 0.0)
+            add(np.zeros(steps_today + 1), cat(j * K + ks_today, mu_col(j)),
+                cat(-tau[:steps_today] / s_, need_today / s_), 0.0)
         need_next = rate_next[j] * tau[steps_today:].sum()
         if need_next > 0 and after > 0:
             s_ = max(need_next, 1.0)
-            ub([(qi(j, k), -tau[k] / s_) for k in range(steps_today, K)] + [(inu, need_next / s_)], 0.0)
+            add(np.zeros(after + 1), cat(j * K + ks_next, inu), cat(-tau[steps_today:] / s_, need_next / s_), 0.0)
+    k1 = np.arange(1, K); n1 = K - 1
+    rp, rm = 2 * np.arange(n1), 2 * np.arange(n1) + 1
+    pair_rows = cat(rp, rp, rp, rm, rm, rm)                    # rows of the |q[k] − q[k−1]| pairs (k ≥ 1)
+    pair_vals = cat(np.ones(n1), -np.ones(n1), -np.ones(n1), -np.ones(n1), np.ones(n1), -np.ones(n1))
     if dq_max is not None:                                     # gate rate
+        rate_cols = cat(k1, k1 - 1, irt + k1, k1, k1 - 1, irt + k1)
         for j in range(J):
-            for k in range(K):
-                for sgn in (1.0, -1.0):
-                    if k == 0:
-                        if q_prev is not None:
-                            ub([(qi(j, 0), sgn), (irt + qi(j, 0), -1.0)], dq_max[j] + sgn * q_prev[j])
-                    else:                              # between blocks: scaled to the distance between midpoints
-                        ub([(qi(j, k), sgn), (qi(j, k - 1), -sgn), (irt + qi(j, k), -1.0)],
-                           dq_max[j] * 0.5 * (tau[k] + tau[k - 1]) / dt)
+            if q_prev is not None:
+                add([0, 0, 1, 1], [j * K, irt + j * K, j * K, irt + j * K], [1.0, -1.0, -1.0, -1.0],
+                    [dq_max[j] + 1.0 * q_prev[j], dq_max[j] + -1.0 * q_prev[j]])
+            if n1 > 0:                                         # between blocks: scaled to the distance between midpoints
+                add(pair_rows, rate_cols + j * K, pair_vals, np.repeat(dq_max[j] * 0.5 * (tau[1:] + tau[:-1]) / dt, 2))
     for j in range(J - 1):                                     # soft: a regulator takes no more than the share μ
         if final:                                              # V̂_j + Σ q τ ≤ μ·x_j + o_j
             x_j, v_j = float(target_today[j]), float(delivered_today[j])
-            scale = max(x_j, 1.0)
-            ub([(qi(j, k), tau[k] / scale) for k in range(steps_today)] + [(mu_col(j), -x_j / scale), (io + j, -1.0)],
-               -v_j / scale)
+            scale_j = max(x_j, 1.0)
+            add(np.zeros(steps_today + 2), cat(j * K + ks_today, mu_col(j), io + j),
+                cat(tau[:steps_today] / scale_j, -x_j / scale_j, -1.0), -v_j / scale_j)
             continue
         need_today = max(remaining_today[j], 0.0)
-        scale = max(need_today, 1.0)
-        ub([(qi(j, k), tau[k] / scale) for k in range(steps_today)] + [(mu_col(j), -need_today / scale), (io + j, -1.0)],
-           0.0)
+        scale_j = max(need_today, 1.0)
+        add(np.zeros(steps_today + 2), cat(j * K + ks_today, mu_col(j), io + j),
+            cat(tau[:steps_today] / scale_j, -need_today / scale_j, -1.0), 0.0)
     if 0 < steps_today < K + 1 and terminal_band is not None:  # terminal level (end of day = h[steps_today])
-        ub([(ih + steps_today - 1, 1.0), (it_, -1.0)], h_ref + terminal_band)
-        ub([(ih + steps_today - 1, -1.0), (it_, -1.0)], -(h_ref - terminal_band))
+        add([0, 0, 1, 1], [ih + steps_today - 1, it_, ih + steps_today - 1, it_], [1.0, -1.0, -1.0, -1.0],
+            [h_ref + terminal_band, -(h_ref - terminal_band)])
     t_today = tau[:steps_today].sum()
     scale = np.zeros(J)
+    r2p, r2m = 2 * kk, 2 * kk + 1
+    track_rows = cat(r2p, r2p, r2m, r2m)
+    track_vals = cat(np.ones(K), -np.ones(K), -np.ones(K), -np.ones(K))
+    track_cols = cat(kk, iu + kk, kk, iu + kk)
+    move_cols = cat(k1, k1 - 1, ig + k1, k1, k1 - 1, ig + k1)
     for j in range(J):                                         # smooth-discharge tracking: u ≥ |q − q̄|
         qbar_today = remaining_today[j] / t_today if t_today > 0 else 0.0
         scale[j] = max(qbar_today, rate_next[j], 1e-3 * capacity[j], 1e-9)
-        for k in range(K):
-            qbar = qbar_today if k < steps_today else rate_next[j]
-            ub([(qi(j, k), 1.0), (iu + qi(j, k), -1.0)], qbar)
-            ub([(qi(j, k), -1.0), (iu + qi(j, k), -1.0)], -qbar)
-        for k in range(K):                                     # gate movement: g ≥ |q[k] − q[k−1]|
-            if k == 0:
-                if q_prev is not None:
-                    ub([(qi(j, 0), 1.0), (ig + qi(j, 0), -1.0)], q_prev[j])
-                    ub([(qi(j, 0), -1.0), (ig + qi(j, 0), -1.0)], -q_prev[j])
-            else:
-                ub([(qi(j, k), 1.0), (qi(j, k - 1), -1.0), (ig + qi(j, k), -1.0)], 0.0)
-                ub([(qi(j, k), -1.0), (qi(j, k - 1), 1.0), (ig + qi(j, k), -1.0)], 0.0)
+        qbar = np.where(kk < steps_today, qbar_today, rate_next[j])
+        add(track_rows, track_cols + j * K, track_vals, np.column_stack([qbar, -qbar]).ravel())
+        if q_prev is not None:                                 # gate movement: g ≥ |q[k] − q[k−1]|
+            add([0, 0, 1, 1], [j * K, ig + j * K, j * K, ig + j * K], [1.0, -1.0, -1.0, -1.0], [q_prev[j], -q_prev[j]])
+        if n1 > 0:
+            add(pair_rows, move_cols + j * K, pair_vals, np.zeros(2 * n1))
+    R, C, V = np.concatenate(blocks_r), np.concatenate(blocks_c), np.concatenate(blocks_v)
+    b_ub = np.concatenate(blocks_b)
     bounds = [(0.0, capacity[j]) for j in range(J) for _ in range(K)]
     bounds += [(None, None)] * K + [(0.0, 1.0), (0.0, 1.0)] + [(0.0, None)] * K + [(0.0, None)] * K + [(0.0, None)] * (J - 1)
     bounds += [(0.0, None)] * nq + [(0.0, None)] * nq + [(0.0, None)]
@@ -373,11 +499,15 @@ def solve_intraday(q_in_hist, q_in_future, h0, remaining_today, rate_next, steps
     for j in range(J):
         c[iu + j * K: iu + (j + 1) * K] = track_weight * tau / tau.sum() / scale[j] / J
         c[ig + j * K: ig + (j + 1) * K] = move_weight / scale[j] / J
-    A_ub = coo_matrix((V, (R, C)), shape=(row_n[0], nv)).tocsr()
+    A_ub = coo_matrix((V, (R, C)), shape=(nrow, nv)).tocsr()
     A_eq = coo_matrix((EV, (ER, EC)), shape=(K, nv)).tocsr()
-    res = _check(_lp(c, A_ub=A_ub, b_ub=np.array(b_ub), A_eq=A_eq, b_eq=np.array(b_eq), bounds=bounds), "execution LP")
+    res = _check(_lp(c, "execution", A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds), "execution LP")
     z = res.x
     mu = float(np.min(z[imj:imj + J])) if weighted else float(z[im])
     return {"q": z[:nq].reshape(J, K), "h": np.r_[h0, z[ih:ih + K]], "mu": mu, "nu": float(z[inu]),
             "slack": float(z[is_:is_ + K].sum()), "mu_j": z[imj:imj + J] if weighted else None,
-            "command_violation": float(z[isc:isc + nq].max(initial=0.0)), "rate_violation": float(z[irt:irt + nq].max(initial=0.0))}
+            "command_violation": float(z[isc:isc + nq].max(initial=0.0)), "rate_violation": float(z[irt:irt + nq].max(initial=0.0)),
+            # violations at the executed (first) interval: (9) and gate rate in m³/s, level bounds in m
+            "first_command_violation": max(0.0, float(z[isc:isc + nq].reshape(J, K)[:, 0].max())),
+            "first_rate_violation": max(0.0, float(z[irt:irt + nq].reshape(J, K)[:, 0].max())),
+            "first_level_slack": max(0.0, float(z[is_]))}

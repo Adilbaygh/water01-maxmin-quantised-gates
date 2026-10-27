@@ -1,76 +1,47 @@
-# ---------------------------------------------------------------------------------------------------------------
-# Public repository: model code, configuration, open and synthetic inputs, results, tests and the interface.
-# Everything else in the working folder (manuscript, working notes, third-party records) stays local.
-# ---------------------------------------------------------------------------------------------------------------
-
-# Manuscript, templates and working material
-/paper/
-/template/
-/references/
-/Reviewers/
-/archive/
-/build/
-/model/
-/KanalPasport/
-/00_problem.md
-
-# Internal notes; only the hypothesis protocol and its translation are public
-/requirements/*
-!/requirements/hypotheses.md
-!/requirements/hypotheses_en.md
-!/requirements/protocol_record_en.md
-
-# Input data: the processed operating records used by the model, the open NASA POWER files and the synthetic inputs
-# are public; the original record sheets, maps and working notes stay local
+# allowlist: everything is ignored except the files named below
+/*
+!/.gitignore
+!/.gitattributes
+!/.github/
+!/pytest.ini
+!/README.md
+!/CITATION.cff
+!/LICENSE
+!/LICENSE-DATA.md
+!/requirements.txt
+!/src/
+!/configs/
+!/docs/
+!/results/
+!/tests/
+!/scripts/
+/scripts/*
+!/scripts/run_cases.py
+!/scripts/rules.py
+!/scripts/analysis_common.py
+!/scripts/analyse_theorems.py
+!/scripts/make_figures.py
+!/scripts/derive_inputs.py
+!/scripts/verification_convergence.py
+!/scripts/verification_pulse.py
+!/scripts/check_swmm_benchmark.py
+# input data: the processed operating records and the NASA POWER files are public; the original record sheets stay
+# local
+!/DATA/
 /DATA/*
-!/DATA/raw/
-/DATA/raw/*
-!/DATA/raw/nasa_power/
-!/DATA/synthetic/
 !/DATA/processed/
 /DATA/processed/*
 !/DATA/processed/README.md
 !/DATA/processed/rashod_2010_2019_daily.csv
 !/DATA/processed/demand_decadal.csv
-!/DATA/processed/limit_2021_kegeyli_decadal.csv
 !/DATA/processed/dispatcher_2020_kegeyli.csv
-
-# Scripts that build the manuscript or prepare private material
-/scripts/build_methods_docx.py
-/scripts/build_appendix_supp.py
-/scripts/refs.py
-/scripts/schema_offtakes.py
-/scripts/make_review_archive.py
-
-# Run artefacts: error files, interrupted writes, short check runs and archived summaries of earlier evaluations
-*.error.txt
-*.part
-/results/verification/rerun/normal/*.tmp
-/results/experiment_check/
-/results/superseded/
-
-# Python, tests and environments
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.pytest_tmp/
-.venv/
-venv/
-env/
-.ipynb_checkpoints/
-*.egg-info/
-
-# Editors and operating systems
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-desktop.ini
-~$*
-*.tmp
-
-# Streamlit secrets
-.streamlit/secrets.toml
-
-# Workflow file, to be moved to .github/workflows/tests.yml before the first commit
-/_github_workflow_tests.yml
+!/DATA/processed/plan_2021_kegeyli_decadal.csv
+!/DATA/processed/annual_volumes_2010_2019.csv
+!/DATA/raw/
+/DATA/raw/*
+!/DATA/raw/nasa_power/
+/results/logs/
+**/*.claim
+**/*.part
+**/*.error.txt
+**/__pycache__/
