@@ -16,7 +16,8 @@ from ..domain.geometry import Reach
 from ..domain.passport import PARAMETERS, optional, value
 from ..evaluation.metrics import compute
 from ..hydraulics.node import DustlikNode, untuned_factors
-from ..optimization.constraints import command_limit
+from ..optimization.constraints import command_limit, lower_to_function
+from ..optimization.lexlp import reset_warm_start
 from .plant_loop import IoTConfig, run_closed_loop
 from .scenarios import SECONDS_PER_DAY, daily_arrays, derive_limit, load_demand, load_limit_2021, load_supply
 
@@ -72,14 +73,25 @@ def build_controller_model(node_model, cfg, dt=None):
             tw = node_model.tailwater_m[j]
             bj = np.r_[tw, bp[bp > tw + 0.05]]
             fj = np.r_[0.0, f[bp > tw + 0.05, j]]
-            chord_set.append(command_limit(bj, fj, h_ref, f_ref[j], slope[j]))
+            alpha, beta = command_limit(bj, fj, h_ref, f_ref[j], slope[j])
             grid = np.linspace(tw, bj[-1], 401)
-            lim = np.min(chord_set[-1][0][:, None] + chord_set[-1][1][:, None] * grid[None, :], axis=0)
-            true = np.array([node_model.max_flows(x)[j] for x in grid])
-            if np.any(lim > true + 1e-9):
-                raise ValueError(f"command constraint (9) of outlet {j + 1} is not conservative")
         else:
-            chord_set.append(command_limit(bp, f[:, j], h_ref, f_ref[j], slope[j]))
+            # barrier: the tail water rises with the discharge, so f_6 is convex over most of the range and its
+            # tangent at H_norm lies below it; where the gates leave the water, the flow height is limited by the
+            # depth, which can make f_6 locally concave (e.g. with a smoother lower reach), so the tangent is checked
+            # on a dense grid as well
+            alpha, beta = command_limit(bp, f[:, j], h_ref, f_ref[j], slope[j], mixed="tangent")
+            grid = np.linspace(bp[0], bp[-1], 441)
+        true = np.array([node_model.max_flows(x)[j] for x in grid])
+        # Below the gate height the full-gate discharge is not concave (the flow height of a gate raised clear of the
+        # water grows with the depth), so a line may exceed it between breakpoints: each line that is the active
+        # minimum where the bound exceeds the discharge is lowered by its largest excess there.
+        alpha = lower_to_function(alpha, beta, grid, true)
+        beta = np.asarray(beta, float)
+        chord_set.append((alpha, beta))
+        lim = np.min(alpha[:, None] + beta[:, None] * grid[None, :], axis=0)
+        if np.any(lim > true + 1e-9):
+            raise ValueError(f"command constraint (9) of outlet {j + 1} is not conservative")
     cap = np.array(value("outlet_capacity_m3s"), float)
     return ControllerModel(
         dt=dt, eta=value("eta"), A_s=value("A_s_identified_m2"),
@@ -129,6 +141,7 @@ def run_closed_loop_period(method, supply_csv, demand_csv, cfg, start, days, tun
     cfg: active configuration (scenarios.load_config). eta_true: true η in the plant (the controller knows the
     nominal η); None means equal to nominal. dt, h_init: from the configuration if None. The supply is multiplied
     by supply_scale (scenario), whereas the limit forecast comes from the historical record (unchanged)."""
+    reset_warm_start()                                         # each run starts its LP solves from scratch
     dt = value("dt_s") if dt is None else dt
     supply = load_supply(supply_csv); demand = load_demand(demand_csv, cfg.demand_variant)
     # the limit forecast is always derived from the record with blank entries as zero, so that a scenario that fills
@@ -142,9 +155,13 @@ def run_closed_loop_period(method, supply_csv, demand_csv, cfg, start, days, tun
     D, A, A_lim = daily_arrays(supply, demand, limit, dates, eta)
     cd_factor, offtake_factor = untuned_factors(tuned)
     rating = optional("outlet_rating_factors")                 # outlet-specific rating error (sensitivity case)
+    # gate relation of the small regulators in the plant and in the controller's model, and gate leakage in the
+    # plant (scenario additions; default: relation (6) in both, gates that seal)
     node_true = DustlikNode(offtake_factor=offtake_factor if rating is None
-                            else offtake_factor * np.asarray(rating, float))
-    node_model = DustlikNode(cd=value("gate_cd") * cd_factor)
+                            else offtake_factor * np.asarray(rating, float),
+                            relation=optional("gate_relation_plant", "submerged"),
+                            leak_opening_m=float(optional("gate_leakage_opening_m", 0.0)))
+    node_model = DustlikNode(cd=value("gate_cd") * cd_factor, relation=optional("gate_relation_controller", "submerged"))
     model = dataclasses.replace(build_controller_model(node_model, cfg, dt), pulse_flow=pulse_flow_for(node_model, iot))
     horizon = Horizon.from_config()
     if horizon.steps_per_day * dt != SECONDS_PER_DAY:

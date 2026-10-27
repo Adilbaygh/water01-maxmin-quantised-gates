@@ -1,5 +1,0 @@
-meta:
-  name: blank_carry
-  description: "Exploratory: blank supply entries replaced by the nearest recorded value of the same season (earlier value; first later value at the start of the season)"
-overrides:
-  supply_blank_days: {value: "carry_forward", status: assumed, source: "blank entries = nearest earlier recorded value of the season; leading blanks = first later recorded value"}

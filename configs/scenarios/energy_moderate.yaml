@@ -1,9 +1,0 @@
-meta:
-  name: energy_moderate
-  description: "Stress test (energy): 30 W panel and 481 Wh battery (half of the baseline kit)"
-overrides:
-  pv_peak_w: {value: 30.0, status: assumed, source: "undersized panel; the largest panel at which the radio is switched off"}
-  battery_capacity_wh: {value: 481.0, status: assumed, source: "half of the Zemu kit"}
-  battery_min_wh: {value: 48.1, status: assumed, source: "10 % of capacity"}
-  battery_reserve_wh: {value: 48.1, status: assumed, source: "10 % of capacity"}
-  battery_resume_wh: {value: 144.3, status: assumed, source: "30 % of capacity"}

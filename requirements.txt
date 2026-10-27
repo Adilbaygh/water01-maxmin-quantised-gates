@@ -1,4 +1,4 @@
-# Pinned environment in which the published results were computed (Python 3.13).
+# Environment in which the reported results were computed (Python 3.13).
 # Install with: python -m pip install -r requirements.txt
 # The .meta.json file next to every result records the actual environment and any difference from these pins.
 numpy==2.3.5
@@ -6,6 +6,5 @@ scipy==1.17.0
 pandas==2.3.3
 PyYAML==6.0.3
 pytest==9.1.1
-# Figures (scripts/fig_methods.py, scripts/fig_results.py)
 matplotlib>=3.8
-pillow>=10.0
+swmm-toolkit==0.17.0    # only scripts/check_swmm_benchmark.py (EPA SWMM 5.2.4)

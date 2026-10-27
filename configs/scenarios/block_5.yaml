@@ -1,5 +1,0 @@
-meta:
-  name: block_5
-  description: "Statistical robustness: moving-block bootstrap with 5-day blocks (evaluation only; simulations unchanged)"
-overrides:
-  bootstrap_block_days: {value: 5, status: setting, source: "sensitivity of the bootstrap block length (5 / 10 / 20 days)"}

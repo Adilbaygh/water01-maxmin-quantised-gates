@@ -3,9 +3,9 @@
 Test case: steady state at 86.7 m3/s and H_norm with fixed openings of the other gates. The R-1 regulator is closed,
 opened by the smallest executable opening (the deadband, 0.5% of the travel, 7.5 mm) for one control step of 900 s,
 and closed again. The control (command) step is fixed at 900 s; the plant integrates it with 1, 2, 4, 8 or 16 equal
-hydraulic steps, with the gate change either theta-weighted over the first hydraulic step (first code versions) or
-applied at the start of the step (gate_change_at_step_start). Recorded: the R-1 volume credited to the control step with the open gate and to the following
-step, their sum, and the node level after the pulse. The exact volume of a pulse at a constant level is
+hydraulic steps, with the gate change either theta-weighted over the first hydraulic step or applied at the start of
+the step (gate_change_at_step_start, the setting of the plant). Recorded: the R-1 volume credited to the control step
+with the open gate and to the following step, and their sum. The exact volume of a pulse at a constant level is
 q(H_norm, 7.5 mm) x 900 s.
 Usage: python scripts/verification_pulse.py  ->  results/verification/pulse.csv and .md
 """

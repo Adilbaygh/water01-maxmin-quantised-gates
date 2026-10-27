@@ -1,0 +1,5 @@
+meta:
+  name: gate_cd_low
+  description: "Exploratory (gate model): discharge coefficient of all gates 20% lower (0.496) in the plant and in the controller's model, consistently"
+overrides:
+  gate_cd: {value: 0.496, status: assumed, source: "0.62 - 20%: consistent change of the uncalibrated coefficient at small openings (Section 4.4)"}

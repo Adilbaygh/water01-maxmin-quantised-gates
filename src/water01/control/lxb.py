@@ -111,7 +111,9 @@ class IntradayExecutor:
                                      target_today=np.asarray(target, float))))
         q = clip_roundoff(sol["q"][:, 0])
         self.q_prev = q
-        self.last = {"mu": sol["mu"], "nu": sol["nu"], "slack": sol["slack"], "h_pred": sol["h"][1]}
+        self.last = {"mu": sol["mu"], "nu": sol["nu"], "slack": sol["slack"], "h_pred": sol["h"][1],
+                     "first_command_violation": sol["first_command_violation"],
+                     "first_rate_violation": sol["first_rate_violation"], "first_level_slack": sol["first_level_slack"]}
         return q
 
 

@@ -1,5 +1,0 @@
-meta:
-  name: eta_high
-  description: "Sensitivity: delivery factor eta = 0.92 (passport efficiency)"
-overrides:
-  eta: {value: 0.92, status: observed, source: "canal passport efficiency"}

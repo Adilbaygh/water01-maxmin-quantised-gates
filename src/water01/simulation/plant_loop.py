@@ -70,6 +70,7 @@ class IoTConfig:
     """IoT constraints (Section 2.6). With all of them disabled, execution is "ideal" (phys)."""
     sensor_accuracy_m: float = 0.0          # 0: error-free measurement; > 0: U(−a, a) (from the datasheet)
     sensor_bias_m: float = 0.0              # persistent offset of the level sensor (sensitivity case)
+    sensor_drift_m_per_day: float = 0.0     # linear drift of the offset from the start of the run (sensitivity case)
     sensor_resolution_m: float = None       # sensor step (from the datasheet); None: no rounding
     gate_resolution: float = None           # as a fraction of the stroke; None: no quantisation
     gate_deadband: float = 0.0
@@ -78,12 +79,67 @@ class IoTConfig:
     loss_probability: float = 0.0
     estimator_blend: float = None           # None: from configuration (estimator_blend)
     energy: bool = False                    # (16): solar-battery balance and radio policy (NASA POWER)
+    # stress options of the IoT layer (scenario additions; 0: inactive). Communication factor C:
+    uplink_loss_probability: float = 0.0    # telemetry packet (level and gate report) lost: no measurement this step
+    channel_burst_fraction: float = 0.0     # Gilbert-Elliott channel: long-run share of steps in the bad state, in
+    channel_burst_mean_steps: float = 1.0   # which every packet of the step is lost; mean length of a bad period
+    command_delay_probability: float = 0.0  # a delivered command is executed at the start of the next step
+    backhaul_outage_rate_per_day: float = 0.0   # gateway backhaul outages (no telemetry and no commands):
+    backhaul_outage_mean_hours: float = 0.0     # onset rate per day and mean duration
+    # energy factor E: outages of the mains supply of the gate drives (the gates cannot move, so neither commands
+    # nor the local low-level and high-level rules are executed; the solar-powered IoT node keeps reporting)
+    grid_outage_rate_per_day: float = 0.0
+    grid_outage_mean_hours: float = 0.0
 
     @property
     def ideal(self):
-        return (self.sensor_accuracy_m == 0 and self.sensor_bias_m == 0 and not self.sensor_resolution_m
+        return (self.sensor_accuracy_m == 0 and self.sensor_bias_m == 0 and self.sensor_drift_m_per_day == 0
+                and not self.sensor_resolution_m
                 and self.gate_resolution is None and not self.gate_deadband and self.message_budget is None
-                and self.loss_probability == 0 and not self.energy)
+                and self.loss_probability == 0 and not self.energy and self.uplink_loss_probability == 0
+                and self.channel_burst_fraction == 0 and self.command_delay_probability == 0
+                and self.backhaul_outage_rate_per_day == 0 and self.grid_outage_rate_per_day == 0)
+
+    @property
+    def stress(self):
+        """True when a stress option of the IoT layer is active (its counters are then written to the result)."""
+        return (self.uplink_loss_probability > 0 or self.channel_burst_fraction > 0
+                or self.command_delay_probability > 0 or self.backhaul_outage_rate_per_day > 0
+                or self.grid_outage_rate_per_day > 0)
+
+
+def two_state_chain(rng, n, p_enter, p_leave):
+    """Boolean sequence of a two-state Markov chain over n steps (True: the bad or outage state), started from its
+    stationary distribution. One uniform draw per step, so the sequence depends on the stream only and not on the
+    controller (common random numbers)."""
+    u = rng.random(n + 1)
+    out = np.zeros(n, bool)
+    if p_enter <= 0.0:
+        return out
+    s = bool(u[0] < p_enter / (p_enter + p_leave))
+    for k in range(n):
+        out[k] = s
+        s = bool(u[k + 1] >= p_leave) if s else bool(u[k + 1] < p_enter)
+    return out
+
+
+def outage_sequence(rng, n, rate_per_day, mean_hours, dt_s):
+    """Outage steps: onsets at rate_per_day per day of operation, geometric durations with mean mean_hours."""
+    if rate_per_day <= 0.0:
+        return np.zeros(n, bool)
+    if mean_hours <= 0.0:
+        raise ValueError("an outage option requires a positive mean duration")
+    return two_state_chain(rng, n, rate_per_day * dt_s / 86_400.0, min(1.0, dt_s / (3600.0 * mean_hours)))
+
+
+def burst_sequence(rng, n, fraction, mean_steps):
+    """Bad-state steps of the Gilbert-Elliott channel: long-run share `fraction`, mean bad-period length mean_steps."""
+    if fraction <= 0.0:
+        return np.zeros(n, bool)
+    if not 0.0 < fraction < 1.0 or mean_steps < 1.0:
+        raise ValueError("channel_burst_fraction must lie in (0, 1) and channel_burst_mean_steps must be at least 1")
+    leave = 1.0 / mean_steps
+    return two_state_chain(rng, n, leave * fraction / (1.0 - fraction), leave)
 
 
 @dataclass
@@ -105,8 +161,20 @@ class ClosedLoopResult:
     energy_used_wh: float = 0.0             # IoT node consumption (RTU + gateway + messages)
     messages_blocked: int = 0               # command packets not sent because the window budget was exhausted
     messages_lost: int = 0                  # command packets sent but lost on the channel
-    low_head_steps: int = 0                 # steps with an open regulator whose head falls below 10 h0 (smoothed gate law)
+    low_head_steps: int = 0                 # steps with an open regulator whose head falls below h_t (Eq. (6))
     low_head_volume_m3: float = 0.0         # volume delivered by such regulators in such steps
+    gate_clear_steps: int = 0               # steps with an open gate raised clear of the water (opening ≥ depth)
+    exec_violations: np.ndarray = None      # [3 × P] daily maxima of the executed step's violations of (9) (m³/s),
+                                            # of the gate-rate limit (m³/s) and of the level bounds (m); NaN without
+                                            # an execution LP
+    # counters of the stress options (IoTConfig.stress)
+    telemetry_lost_steps: int = 0           # steps with the link up whose telemetry packet was lost
+    burst_steps: int = 0                    # steps in the bad state of the channel
+    backhaul_off_steps: int = 0             # steps with the backhaul down
+    grid_off_steps: int = 0                 # steps with the gate drives without mains supply
+    commands_delayed: int = 0               # delivered command packets executed one step late
+    delayed_dropped: int = 0                # delayed commands not executed because the next step had no link or mains
+    safety_blocked_steps: int = 0           # steps of a mains outage at which the low-level or high-level rule applied
 
 
 def command_to_openings(cmd, node_model, h_est, current):
@@ -130,9 +198,9 @@ class CanalPlant:
     observe(): what the sensors see (with ν); truth(): for Oracle and the recorder only; advance(): one Δt step."""
 
     def __init__(self, reach, node, supply_m3s, eta, h_init, dt, steps_per_day, theta, rng, sensor_accuracy_m=0.0,
-                 sensor_resolution_m=None, sensor_bias_m=0.0):
+                 sensor_resolution_m=None, sensor_bias_m=0.0, sensor_drift_m_per_day=0.0):
         self.reach, self.node, self.theta, self.dt, self.spd = reach, node, theta, dt, steps_per_day
-        self.sensor_bias_m = sensor_bias_m
+        self.sensor_bias_m = sensor_bias_m; self.sensor_drift = sensor_drift_m_per_day
         self.S = np.asarray(supply_m3s, float); self.P = self.S.size
         self.rng, self.sensor_accuracy_m, self.sensor_resolution_m = rng, sensor_accuracy_m, sensor_resolution_m
         day_s = steps_per_day * dt
@@ -146,7 +214,8 @@ class CanalPlant:
         self.delivered = DeliveryLedger(6, self.P)
         self.gate_jump = bool(optional("gate_change_at_step_start", False))
         self.jump_theta = optional("gate_change_first_theta", None)    # time weight of the step after a gate change
-        self.h0_gate = value("gate_head_regularisation_m"); self.low_head_steps = 0; self.low_head_volume = 0.0
+        self.h_t = float(value("gate_head_transition_m"))             # transition head of the gate law (6)
+        self.low_head_steps = 0; self.low_head_volume = 0.0; self.gate_clear_steps = 0
         self.V0 = reach.volume(self.solver.h); self.net = 0.0; self.substeps = 0
         self.k = 0
 
@@ -193,9 +262,11 @@ class CanalPlant:
         (assumed to be observed exactly)."""
         h = float(self.solver.h[-1])
         u = self.rng.uniform(-1.0, 1.0)        # drawn at every step, whether or not the sensor error is active
-        z = (measure(h, self.sensor_accuracy_m, resolution_m=self.sensor_resolution_m, unit_noise=u,
-                     bias_m=self.sensor_bias_m)
-             if self.sensor_accuracy_m > 0 or self.sensor_bias_m != 0 or self.sensor_resolution_m else h)
+        bias = (self.sensor_bias_m if not self.sensor_drift
+                else self.sensor_bias_m + self.sensor_drift * self.solver.t / 86_400.0)
+        z = (measure(h, self.sensor_accuracy_m, resolution_m=self.sensor_resolution_m, unit_noise=u, bias_m=bias)
+             if self.sensor_accuracy_m > 0 or self.sensor_bias_m != 0 or self.sensor_drift or self.sensor_resolution_m
+             else h)
         return Observation(t=self.solver.t, day=self.day, step=self.step_in_day, level=z,
                            inflow=float(self.S[min(self.day, self.P - 1)]), openings=self.openings.copy())
 
@@ -226,14 +297,18 @@ class CanalPlant:
             vol += dt_i * (th * flows_new + (1 - th) * self._flows_old)
             self._flows_old = flows_new
         self.delivered.add(self.day, vol / dt, dt)
-        # exposure to the smoothed part of the gate law: open regulators with a head below 10 h0 at the start of the
-        # step or at the end of any hydraulic substep
+        # regime diagnostics at the lowest node level of the step (its start or the end of any hydraulic substep):
+        # an open regulator with a head below the transition head h_t of the gate law (where the head term departs
+        # from √Δh), and an open gate raised clear of the water (opening at or above the upstream depth, where the
+        # flow height is limited by the depth)
         h_min = min([h_start] + [p[1] for p in self.solver.last_substeps])
         head = h_min - np.asarray(self.node.tailwater_m, float)
-        low = (self.openings[:5] > 0) & (head < 10.0 * self.h0_gate)
+        low = (self.openings[:5] > 0) & (head < self.h_t)
         if low.any():
             self.low_head_steps += 1
             self.low_head_volume += float(vol[:5][low].sum())
+        if np.any((self.openings > 0) & (self.openings >= h_min)):
+            self.gate_clear_steps += 1
         self.substeps += int(self.solver.substeps > self.solver.base_substeps)   # Newton fallbacks only
         self.k += 1
         return self._flows_old
@@ -267,9 +342,14 @@ class StateEstimator:
         # True: the gates hold the new openings over the whole step, so the reconstructed flow at the start of the
         # step is evaluated with the new openings at the previous level estimate (False: previous openings)
         self.constant_openings = bool(optional("ledger_constant_openings", False))
+        # the same time weight as the plant: a fully implicit first step after a gate change (gate_change_first_theta)
+        self.gate_jump = bool(optional("gate_change_at_step_start", False))
+        self.jump_theta = optional("gate_change_first_theta", None)
+        self._prev_openings = None
 
     def start(self, openings):
         self._old = self.node.flows(self.h, openings)
+        self._prev_openings = np.array(openings, float).copy()
 
     def state(self, obs, plant=None):
         """ControlState for the controller. If plant is given (Oracle), the true level and volume are used."""
@@ -283,7 +363,8 @@ class StateEstimator:
         """Updates the estimate with the post-step measurement and reconstructs the delivery."""
         m = self.m
         h_prev = self.h
-        if self.iot.sensor_accuracy_m > 0 or self.iot.sensor_bias_m != 0 or obs_after.level is None:  # None: no radio
+        if (self.iot.sensor_accuracy_m > 0 or self.iot.sensor_bias_m != 0 or self.iot.sensor_drift_m_per_day != 0
+                or obs_after.level is None):                                                    # None: no telemetry
             q_rec = self.node.flows(self.h, obs_after.openings)
             pred = id_step(self.h, self.hist[0] if m.d > 0 else inflow_used, q_rec[:5], q_rec[5], m.A_s, m.dt, m.eta)
             self.h = update(obs_after.level, self.h, 0.0, 10.0, pred, self.iot.estimator_blend)  # None -> config
@@ -291,9 +372,11 @@ class StateEstimator:
             self.h = float(obs_after.level)
         new = self.node.flows(self.h, obs_after.openings)
         old = self.node.flows(h_prev, obs_after.openings) if self.constant_openings else self._old
-        self.ledger.add(obs_after.day if obs_after.step > 0 else obs_after.day - 1,
-                        self.theta * new + (1 - self.theta) * old, m.dt)
+        changed = self._prev_openings is not None and not np.array_equal(obs_after.openings, self._prev_openings)
+        th = self.jump_theta if (self.gate_jump and changed and self.jump_theta is not None) else self.theta
+        self.ledger.add(obs_after.day if obs_after.step > 0 else obs_after.day - 1, th * new + (1 - th) * old, m.dt)
         self._old = new
+        self._prev_openings = np.array(obs_after.openings, float).copy()
         if m.d > 0:
             self.hist = (self.hist + [inflow_used])[-m.d:]
 
@@ -305,7 +388,7 @@ class Actuator:
     def __init__(self, node_model, iot, initial):
         self.node, self.iot = node_model, iot
         self.position = np.array(initial, float)
-        self.limited = iot.message_budget is not None or iot.loss_probability > 0
+        self.limited = iot.message_budget is not None or iot.loss_probability > 0 or iot.channel_burst_fraction > 0
         self.link = LinkState(iot.message_window_steps or 1,
                               iot.message_budget if iot.message_budget is not None else 10 ** 9)
         self.packets_sent = 0                                   # packets actually transmitted (energy balance)
@@ -313,6 +396,8 @@ class Actuator:
         self.interlock_steps = 0
         self.relief_steps = 0; self.relief_active = False
         self.tx_steps = 0                                       # steps at which the commanded opening changed
+        self.pending = None                                     # delivered command executed at the next step
+        self.delayed = 0; self.delayed_dropped = 0
 
     def relief(self, measured_level, open_level, release_level):
         """High level (Section 2.6): the Dustlik node has no emergency spillway (passport, Annex 4), so surplus water is
@@ -349,9 +434,20 @@ class Actuator:
                 for a, amax, prev in zip(openings, self.node.max_opening, previous)]
         return np.array(frac) * self.node.max_opening
 
-    def apply(self, command, level, step_index, link_draw=1.0):
+    def hold(self):
+        """No command reaches the gates at this step (radio off, backhaul or mains outage); a delayed command that
+        was due at this step is not executed."""
+        if self.pending is not None:
+            self.pending = None; self.delayed_dropped += 1
+        return self.position.copy()
+
+    def apply(self, command, level, step_index, link_draw=1.0, channel_bad=False, delay=False):
         """link_draw ∈ [0, 1) is the packet-loss draw of this step, taken from the communication stream at every
-        step, so that packet losses do not depend on how many packets a controller sends."""
+        step, so that packet losses do not depend on how many packets a controller sends. channel_bad: the channel
+        is in its bad state (the packet is lost); delay: a delivered packet is executed at the start of the next
+        step (a command delayed at the previous step is executed first)."""
+        if self.pending is not None:
+            self.position = self.pending; self.pending = None
         a_req, lost = command_to_openings(command, self.node, level, self.position)
         self.lost_steps += lost; self.last_lost = lost
         a_req = self.executable(a_req, self.position)
@@ -362,12 +458,19 @@ class Actuator:
             self.tx_steps += 1
             if self.limited:
                 sent_before = self.link.sent_total
-                if transmit(self.link, step_index, delivered=link_draw >= self.iot.loss_probability):
-                    self.position = a_req.copy()
+                if transmit(self.link, step_index,
+                            delivered=link_draw >= self.iot.loss_probability and not channel_bad):
+                    self._execute(a_req, delay)
                 self.packets_sent += self.link.sent_total - sent_before
             else:
-                self.position = a_req.copy(); self.packets_sent += 1
+                self._execute(a_req, delay); self.packets_sent += 1
         return self.position.copy()
+
+    def _execute(self, a_req, delay):
+        if delay:
+            self.pending = a_req.copy(); self.delayed += 1
+        else:
+            self.position = a_req.copy()
 
 
 class Recorder:
@@ -409,16 +512,34 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
     pv_wh: PV energy per step (required with iot.energy; from NASA POWER, prepared by the runner).
     With the energy factor, the radio is switched off when the charge falls below the reserve: the controller
     receives no measurements (prediction-only estimate) and commands do not arrive (gates stay in place); the
-    local RTU interlock and relief rules keep operating."""
+    local RTU interlock and relief rules keep operating. A backhaul outage acts in the same way (the node keeps its
+    energy use). A lost telemetry packet leaves the controller without the measurement and the gate report of the
+    step. During a mains outage of the gate drives the gates do not move: neither commands nor the local rules are
+    executed (steps at which a local rule applied are counted)."""
     iot = iot or IoTConfig()
     theta = value("preissmann_theta") if theta is None else theta
     # Independent random streams for sensor noise and packet loss (common random numbers): each stream is drawn
     # once per control step, so every coalition of IoT constraints and every controller sees the same sensor
     # innovation and the same packet-loss draw at the same step.
-    sensor_rng, link_rng = (np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(2))
+    # The stress options use further streams (spawned children 2-6); children 0 and 1 are the same as with two
+    # children, so runs without these options are unchanged.
+    streams = np.random.SeedSequence(seed).spawn(7)
+    sensor_rng, link_rng = (np.random.default_rng(s) for s in streams[:2])
     m, hz = constraints, horizon
     dt, spd = m.dt, hz.steps_per_day
     S = np.asarray(supply_m3s, float); P = S.size
+    N = P * spd
+    if iot.stress:
+        up_rng, delay_rng, channel_rng, backhaul_rng, grid_rng = (np.random.default_rng(s) for s in streams[2:])
+        up_lost = up_rng.random(N) < iot.uplink_loss_probability
+        delayed = delay_rng.random(N) < iot.command_delay_probability
+        burst = burst_sequence(channel_rng, N, iot.channel_burst_fraction, iot.channel_burst_mean_steps)
+        backhaul_down = outage_sequence(backhaul_rng, N, iot.backhaul_outage_rate_per_day,
+                                        iot.backhaul_outage_mean_hours, dt)
+        grid_down = outage_sequence(grid_rng, N, iot.grid_outage_rate_per_day, iot.grid_outage_mean_hours, dt)
+    else:
+        up_lost = delayed = burst = backhaul_down = grid_down = np.zeros(N, bool)
+    telemetry_lost = safety_blocked = 0
     oracle = getattr(controller, "perfect_information", False)
     forecast = m.eta * S * spd * dt if oracle else np.asarray(forecast_m3, float)
     controller.reset()
@@ -430,7 +551,7 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
     interlock_level = value("rtu_low_level_interlock_m")
     relief_open, relief_release = value("relief_open_level_m"), value("relief_release_level_m")
     plant = CanalPlant(plant_reach, node_true, S, eta_true, h_init, dt, spd, theta, sensor_rng, iot.sensor_accuracy_m,
-                       iot.sensor_resolution_m, iot.sensor_bias_m)
+                       iot.sensor_resolution_m, iot.sensor_bias_m, iot.sensor_drift_m_per_day)
     estimator = StateEstimator(node_model, m, theta, P, plant.h0[-1], S[0], iot)
     recorder = Recorder(P)
     energy = None
@@ -452,11 +573,13 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
     estimator.start(actuator.position)
 
     day_target = np.zeros(6)                                   # daily plan of the current day (H6 reference)
+    exec_viol = np.full((3, P), np.nan)                        # daily maxima of the execution LP's violations
+    viol_keys = ("first_command_violation", "first_rate_violation", "first_level_slack")
     head_lost_steps = np.zeros(6, int)
     known_openings = actuator.position.copy()                  # gate positions last reported over the radio
     radio_prev = True                                          # telemetry during the previous step
 
-    for k in range(P * spd):                                   # time_grid
+    for k in range(N):                                         # time_grid
         p = k // spd
         if k == 0:
             observation, command = obs0, cmd0
@@ -468,15 +591,24 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
             state = estimator.state(observation, plant if oracle else None)
             command = controller.step(state=state, demand=demand, supply=supply_at(p), constraints=m,
                                       horizon=hz).validate()
+        info = getattr(command, "info", None) or {}
+        if viol_keys[0] in info:
+            exec_viol[:, p] = np.fmax(exec_viol[:, p], [float(info[key]) for key in viol_keys])
         level_for_gates = plant.truth()["level"] if oracle else estimator.h
         radio = energy is None or energy.radio_on
+        link = radio and not backhaul_down[k]                  # the controller can reach the node at this step
         link_draw = link_rng.random()                          # drawn at every step (common random numbers)
         tx0 = actuator.packets_sent
-        applied = actuator.apply(command, level_for_gates, k, link_draw) if radio else actuator.position.copy()
-        if actuator.interlock(observation.level, interlock_level):
-            applied = actuator.position.copy()
-        elif actuator.relief(observation.level, relief_open, relief_release):
-            applied = actuator.position.copy()
+        if grid_down[k]:                                       # no mains supply: the gates cannot move
+            applied = actuator.hold()
+            safety_blocked += int(observation.level < interlock_level or observation.level >= relief_open)
+        else:
+            applied = (actuator.apply(command, level_for_gates, k, link_draw, bool(burst[k]), bool(delayed[k]))
+                       if link else actuator.hold())
+            if actuator.interlock(observation.level, interlock_level):
+                applied = actuator.position.copy()
+            elif actuator.relief(observation.level, relief_open, relief_release):
+                applied = actuator.position.copy()
         q_true = plant.advance(applied, dt)
         # H6: a regulator lacks head when, at the true level, even its full opening cannot pass the planned rate
         if command.target is not None:
@@ -486,13 +618,15 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
         head_lost[:5] = (req[:5] > 0) & (node_true.max_flows(plant.truth()["level"])[:5] < req[:5] * (1 - 1e-6))
         head_lost_steps += head_lost
         last_obs = plant.observe()                             # observation: z = h + ν (once per step)
-        if radio:
+        telemetry = link and not (up_lost[k] or burst[k])      # the telemetry packet of the step arrives
+        telemetry_lost += int(link and not telemetry)
+        if telemetry:
             known_openings = last_obs.openings.copy()
             estimator.update(last_obs, S[p])
         else:                                                  # no telemetry: prediction only, last reported gates
             estimator.update(Observation(last_obs.t, last_obs.day, last_obs.step, None, last_obs.inflow,
                                          known_openings.copy()), S[p])
-        radio_prev = radio
+        radio_prev = telemetry
         if energy is not None:                                 # (16): load and messages (uplink + downlink)
             energy.advance(k, int(radio) + (actuator.packets_sent - tx0))
         recorder.write(p, command, t=plant.solver.t, h_true=plant.truth()["level"], h_est=estimator.h, q_in=S[p],
@@ -508,4 +642,6 @@ def run_closed_loop(controller, plant_reach, node_true, node_model, constraints,
                             0.0 if energy is None else float(energy.used_wh),
                             actuator.link.blocked if actuator.limited else 0,
                             actuator.link.lost if actuator.limited else 0,
-                            plant.low_head_steps, plant.low_head_volume)
+                            plant.low_head_steps, plant.low_head_volume, plant.gate_clear_steps, exec_viol,
+                            telemetry_lost, int(burst.sum()), int(backhaul_down.sum()), int(grid_down.sum()),
+                            actuator.delayed, actuator.delayed_dropped, safety_blocked)

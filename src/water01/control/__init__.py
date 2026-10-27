@@ -13,7 +13,9 @@ CONTROLLERS -- classes operating in closed loop with the Saint-Venant plant (sim
     B3V      -- B3 + feedback on daily volume (control variant);
     LXB-DA   -- LXB aware of the actuation deadband (pulse rule; sensitivity variant);
     LXB-F    -- LXB whose execution LP maximises the final daily share of the plan (exploratory);
-    B3V-DA   -- B3V with the pulse rule of LXB-DA (exploratory).
+    B3V-DA   -- B3V with the pulse rule of LXB-DA (exploratory);
+    ROT      -- rotation of the small regulators with proportional targets and PI level control (current practice
+                at small outlets; comparator).
 Static functions (b3_proportional, lxb_receding, oracle) are hydraulics-free versions for code checks.
 """
 from .b0 import B0Controller
@@ -24,10 +26,11 @@ from .interface import Command, ControlState, Controller, Demand, Horizon, Suppl
 from .lxb import (LXBController, LXBDeadbandAwareController, LXBFinalShareController, LXBNoStage3Controller,
                   lxb_receding)
 from .oracle import OracleController, oracle
+from .rotation import RotationController
 
 CONTROLLERS = {"B0": B0Controller, "B1": B1Controller, "B2": B2Controller, "B3": B3Controller,
                "LXB": LXBController, "Oracle": OracleController, "LXB-noS3": LXBNoStage3Controller,
                # control variants: descriptive only, not part of the hypothesis tests
                "B3V": B3VController, "LXB-DA": LXBDeadbandAwareController,
-               "LXB-F": LXBFinalShareController, "B3V-DA": B3VDeadbandAwareController}
+               "LXB-F": LXBFinalShareController, "B3V-DA": B3VDeadbandAwareController, "ROT": RotationController}
 STATIC = {"B3": b3_proportional, "LXB": lxb_receding, "Oracle": oracle}

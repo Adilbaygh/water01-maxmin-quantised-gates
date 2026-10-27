@@ -1,4 +1,0 @@
-meta:
-  name: b3v_deadband
-  description: "Exploratory: B3V-DA, proportional rationing with volume feedback and the pulse rule of LXB-DA; baseline parameters"
-overrides: {}

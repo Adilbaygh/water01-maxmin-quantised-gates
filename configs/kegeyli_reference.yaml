@@ -26,15 +26,15 @@ canal:                       # Section 2.1, Table 1
   n_manning: {value: 0.0185, status: derived, source: "160 m3/s at H_max, actual geometry "}
   n_design: {value: 0.0193, status: derived, source: "160 m3/s at H_max, design geometry"}
   n_range: {value: [0.016, 0.025], status: assumed, source: "Chow (1959), clean earth channels"}
-  eta: {value: 0.82, status: derived, source: "2020 dispatcher sheets, median ratio of node to head discharge on steady days"}
-  eta_range: {value: [0.75, 0.92], status: assumed, source: "IQR lower bound; passport efficiency upper bound"}
-  demand_eta_reference: {value: 0.82, status: setting, source: "eta used to derive DATA/processed/demand_decadal.csv; demand scales with eta (Equation (1))"}
+  eta: {value: 0.81, status: derived, source: "2020 dispatcher sheets: median ratio of the node to the head discharge on the 114 steady days (head discharge within 5% of the previous day; scripts/derive_inputs.py)"}
+  eta_range: {value: [0.75, 0.92], status: assumed, source: "lower bound below the lower quartile (0.77) of the 2020 steady days; passport efficiency as upper bound"}
+  demand_eta_reference: {value: 0.81, status: setting, source: "eta used to derive DATA/processed/demand_decadal.csv; demand scales with eta (Equation (1))"}
   Q_c_m3s: {value: 86.7, status: derived, source: "Manning discharge at H_min"}
 
 id_model:                    # Section 2.4, Equation (8)
   A_s_m2: {value: 549000.0, status: derived, source: "T(H_norm) x L, actual geometry (upper bound)"}
-  A_s_identified_m2: {value: 391000.0, status: derived, source: "SV step response at H_norm with conveyance losses eta, dQ=±1 m3/s applied at the step start, mean of both signs (scripts/identify_id_model.py)"}
-  tau_identified_s: {value: 1380.0, status: derived, source: "same identification; d = ceil(tau/dt)"}
+  A_s_identified_m2: {value: 392000.0, status: derived, source: "SV step response at H_norm with conveyance losses eta, dQ=±1 m3/s applied at the step start, mean of both signs (scripts/identify_id_model.py)"}
+  tau_identified_s: {value: 1395.0, status: derived, source: "same identification; d = ceil(tau/dt)"}
   id_step_dq_m3s: {value: 1.0, status: setting, source: "identification protocol: inflow step ±dQ at Q_c"}
   id_duration_h: {value: 6, status: setting, source: "identification protocol: response duration"}
   id_fit_fraction: {value: 0.5, status: setting, source: "identification protocol: line fitted to the last half"}
@@ -60,9 +60,10 @@ numerics:                    # numerical settings
   preissmann_theta: {value: 0.6, status: setting, source: "Cunge et al. (1980): 0.55–0.67; 0.5 is neutrally stable"}
   preissmann_nodes: {value: 58, status: setting, source: "dx ≈ 200 m; grid convergence test N = 21/41/81"}
   newton_tolerance: {value: 1.0e-9, status: setting, source: "relative step tolerance"}
-  newton_max_iter: {value: 30, status: setting, source: ""}
+  newton_max_iter: {value: 30, status: setting, source: "Newton iterations per hydraulic step before the step is split (up to 64 substeps)"}
   jacobian_fd_step: {value: 1.0e-7, status: setting, source: "relative finite-difference step"}
-  gate_head_regularisation_m: {value: 1.0e-3, status: setting, source: "softplus scale of sqrt(head+): smooth at zero head (Newton)"}
+  gate_head_transition_m: {value: 1.0e-2, status: setting, source: "width of the C1 transition of sqrt(head+) above zero head; no flow at zero or negative head (Newton convergence)"}
+  gate_clear_smoothing_exponent: {value: 50, status: setting, source: "p-norm smoothing of min(opening, upstream depth): flow height of a gate raised clear of the water"}
   plant_substeps: {value: 1, status: setting, source: "hydraulic steps per control step; pulse and closed-loop convergence with 1-8 steps (Table S2b)"}
   gate_change_at_step_start: {value: true, status: setting, source: "gates and daily supply change at the start of a control step (piecewise-constant commands)"}
   gate_change_first_theta: {value: 1.0, status: setting, source: "fully implicit first hydraulic step after a gate change (damps the alternating mode of the theta scheme)"}
@@ -71,11 +72,11 @@ numerics:                    # numerical settings
   lp_dual_feasibility_tolerance: {value: 1.0e-9, status: setting, source: "HiGHS"}
 
 simulation:                  # Section 2.10
-  seed: 20261003
-  years: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
-  vegetation_months: [4, 5, 6, 7, 8, 9]
-  season_start: "04-01"
-  season_days: 183
+  seed: {value: 20261003, status: setting, source: "base seed of the random streams; season y uses seed + y (common random numbers)"}
+  years: {value: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019], status: observed, source: "years of the daily operating records (DATA/processed/rashod_2010_2019_daily.csv)"}
+  vegetation_months: {value: [4, 5, 6, 7, 8, 9], status: observed, source: "vegetation season of the irrigation system (2021 plan and limit, April-September)"}
+  season_start: {value: "04-01", status: observed, source: "first day of the vegetation season"}
+  season_days: {value: 183, status: observed, source: "1 April - 30 September"}
   demand_variant: {value: "A", status: setting, source: "A — observed Abad-Yarmish share; B — area; C — capacity"}
   supply_blank_days: {value: "zero", status: assumed, source: "blank entries = no delivery"}
   supply_scale: {value: 1.0, status: setting, source: "multiplier on the recorded supply (scenarios)"}
@@ -146,10 +147,10 @@ hypotheses:                  # Section 2.9, protocol requirements/hypotheses.md
   alpha: {value: 0.05, status: setting, source: "two-sided"}
   min_sign_share: {value: 0.7, status: setting, source: "correct sign in at least 7/10 years"}
   bootstrap_block_days: {value: 10, status: setting, source: "moving-block bootstrap within year"}
-  bootstrap_replicates: {value: 10000, status: setting, source: ""}
+  bootstrap_replicates: {value: 10000, status: setting, source: "replicates of every bootstrap interval (hypothesis protocol)"}
   holm_families: {value: {H1: [B0, B1, B2, B3], H5: [B0, B1, B2, B3], H6: [B0, B3]}, status: setting, source: "hypotheses.md §1"}
 
 verification:                # Section 2.10
-  mass_balance_relative_tolerance: {value: 0.001, status: setting, source: ""}
-  grid_convergence_relative_tolerance: {value: 0.005, status: setting, source: ""}
+  mass_balance_relative_tolerance: {value: 0.001, status: setting, source: "acceptance threshold of the relative mass-balance error of a run (hypothesis protocol)"}
+  grid_convergence_relative_tolerance: {value: 0.005, status: setting, source: "acceptance threshold of the grid-convergence check (hypothesis protocol)"}
   oracle_gap_threshold: {value: 0.01, status: setting, source: "practical-equivalence margin of the Oracle gap"}

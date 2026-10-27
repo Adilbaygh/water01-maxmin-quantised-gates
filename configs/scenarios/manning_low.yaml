@@ -1,0 +1,6 @@
+meta:
+  name: manning_low
+  description: "Sensitivity: Manning coefficient 0.016 in the pool and in the lower reach (end of the assumed range 0.016-0.025); the controller keeps the ID model identified with the baseline roughness"
+overrides:
+  n_manning: {value: 0.016, status: assumed, source: "end of the assumed range 0.016-0.025"}
+  lower_reach: {value: {L: 25160.0, b: 36.0, m: 2.0, S0: 1.0e-4, n: 0.016}, status: assumed, source: "barrier tail water: lower reach with the roughness of the pool (baseline rule)"}

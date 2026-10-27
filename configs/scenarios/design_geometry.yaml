@@ -9,8 +9,8 @@ overrides:
   H_min_m: {value: 2.80, status: observed, source: "Canal passport, design"}
   h_init_m: 3.78
   h_min_operating_m: {value: 2.80, status: observed, source: "design H_min"}
-  A_s_identified_m2: {value: 391000.0, status: derived, source: "Saint-Venant step response at the design H_norm with conveyance losses eta, dQ=±1 m3/s applied at the step start, mean of both signs (scripts/identify_id_model.py)"}
-  tau_identified_s: {value: 915.0, status: derived, source: "same identification; d = ceil(tau/dt)"}
+  A_s_identified_m2: {value: 392000.0, status: derived, source: "Saint-Venant step response at the design H_norm with conveyance losses eta, dQ=±1 m3/s applied at the step start, mean of both signs (scripts/identify_id_model.py)"}
+  tau_identified_s: {value: 925.0, status: derived, source: "same identification; d = ceil(tau/dt)"}
   relief_open_level_m: {value: 4.00, status: observed, source: "= design H_max (filling depth); the actual-geometry value 3.43 m lies below the design H_norm of 3.78 m"}
   relief_release_level_m: {value: 3.90, status: assumed, source: "hysteresis 0.10 m below relief_open_level_m (as in the baseline)"}
   lower_reach: {value: {L: 25160.0, b: 28.0, m: 2.0, S0: 1.0e-4, n: 0.0193}, status: assumed, source: "barrier tail water: lower reach with the design geometry of the upper reach (baseline rule: geometry as upper reach)"}

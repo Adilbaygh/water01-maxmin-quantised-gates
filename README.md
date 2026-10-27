@@ -1,171 +1,68 @@
-# Water-01: IoT executability price of lexicographic water allocation
+# water-01: max–min water delivery through quantised gates at a canal node
 
-[![tests](../../actions/workflows/tests.yml/badge.svg)](../../actions/workflows/tests.yml)
+Computation project of the article on max–min (worst-user) water delivery through gates with a finite resolution and
+an actuator deadband, with the Dustlik node of the Kegeyli irrigation canal (Republic of Karakalpakstan, Uzbekistan)
+as the case. The project contains the theory module of the article, the closed-loop Saint–Venant simulation core,
+the execution rules, the simulation cases, the analysis scripts and the results.
 
-Code, configuration, inputs and results of the article
+## Contents
 
-> Kudaybergenov, A.; Kabulov, A.; Kazimbetova, M.; Ametova, G.; Ispanova, J.; Shikhiyev, R. Quantifying the IoT Executability Price of Lexicographic Water Allocation: A Saint–Venant
-> Simulation Study of the Kegeyli Irrigation Canal, Uzbekistan. *Water* (MDPI), 2026 (submitted).
-
-The model simulates one pool of the Kegeyli canal (PK 0+00–114+40) with the Saint–Venant equations (Preissmann
-scheme) and the six outlets of the Dustlik node over the vegetation seasons 2010–2019. A daily lexicographic plan
-(max–min-first: satisfaction of the worst user, then total satisfaction, then day-to-day variation) is executed every
-15 min by a receding-horizon controller (LXB), which recovers the remaining daily plan in equal proportion for all
-users, and compared with an area-based, PI-controlled surrogate for current practice (B0), an open-loop fair plan (B1),
-a weighted-sum controller (B2), proportional rationing (B3) and an Oracle. Every controller runs with ideal execution
-(*phys*) and through a simulated IoT chain (*IoT*): level-sensor error, actuator quantisation and deadband, a LoRaWAN
-packet budget with packet loss, and a solar energy balance of the node. The **IoT executability price**
-
-Π₁ = (λ^phys − λ^IoT) / λ^phys
-
-is the relative loss of λ, the daily delivered-to-demanded volume of the worst-served user, and Shapley values
-attribute it to the four device constraints.
-
-| Controller (tuned gate coefficients) | mean daily λ, phys | mean daily λ, IoT | Π₁ (ratio of means) |
-|---|---|---|---|
-| LXB (proposed) | 0.812 | 0.765 | 5.8% |
-| B0 current practice | 0.797 | 0.445 | 44.1% |
-| B3 proportional rationing | 0.812 | 0.276 | 66.0% |
-| LXB-DA, deadband-aware execution (exploratory) | 0.812 | 0.811 | 0.1% |
-
-The tables and numbers of the article are regenerated from the stored results by `scripts/make_results_tables.py`
-(`results/tables/`); the quantities that need the demand records (see *Data*) are skipped without them.
-
-## Quick start: the graphical interface
-
-```bash
-git clone <repository URL>
-cd <repository folder>
-python -m pip install -r requirements.txt -r requirements-gui.txt     # Python 3.13
-streamlit run app/water01_app.py
-```
-
-The interface opens in the browser and has six pages:
-
-| Page | Content |
+| Path | Content |
 |---|---|
-| Overview | the study in brief, the main numbers and the figures of the article |
-| Results explorer | daily worst-user satisfaction, satisfaction of each user and node level of every stored run |
-| IoT price | price of every controller, daily price of LXB, Shapley attribution by season |
-| Hypothesis tests | pre-specified tests H1–H7 with the bootstrap variants, exploratory comparisons, sensitivity cases, verification |
-| Run the model | closed-loop simulation of a chosen period, controller, scenario and set of IoT constraints |
-| Reproducibility | code checksum of the copy and of the stored results, software environment, commands |
+| `src/quantmaxmin/` | Theory module: continuous level λ\*, quantised level λ_q and price of indivisibility Π_ind (Theorem 2, exact algorithm and mixed-integer check); abstract quantised actuator and the execution rules of Theorems 1, 3 and 4 |
+| `src/water01/` | Simulation core, version 1.4.0, unchanged: Saint–Venant pool (Preissmann scheme), Dustlik node with six outlets, daily three-stage lexicographic plan and 15-min execution programme (LXB), IoT layer (level sensor, quantised actuator with deadband, LoRaWAN budget, solar energy balance). File checksums: `docs/CORE_MANIFEST.sha256` |
+| `scripts/rules.py` | Execution rules registered as controllers of the core: θ pulse rule (`LXB-T000`, `LXB-T025`, `LXB-T050`, `LXB-T075`), equal split (`LXB-ES`), carry-over of the daily debt (`LXB-CO`) |
+| `scripts/run_cases.py` | Simulation cases (seasons 2010–2019, 1 April–30 September), resumable and parallel |
+| `scripts/analyse_theorems.py` | Closed-loop checks of Theorems 1–4 and outcome of the rules → `results/analysis/` |
+| `scripts/make_figures.py` | Figures → `results/figures/` |
+| `scripts/verification_convergence.py`, `scripts/verification_pulse.py`, `scripts/check_swmm_benchmark.py` | Verification of the plant: grid and time-step convergence, volume of a single pulse, comparison with EPA SWMM 5 → `results/verification/` |
+| `scripts/derive_inputs.py` | Delivery factor, monthly shares of the Abad-Yarmish regulator, node balance and checks of the records → `results/inputs/derived_inputs.json`; with `--write-demand`, the demand file (reproduced bit for bit) |
+| `docs/EXPERIMENT.md` | Design of the computational experiment: plant, plan, actuator, rules, cases, recorded quantities and checks |
+| `docs/EXPECTED_OUTCOMES_uz.md` | Expected outcomes of the rules, the device chain and the robustness cases, recorded (in Uzbek) before these results were examined |
+| `tests/` | Randomised checks of Theorems 1–4 on the abstract actuator (about 20 000 instances, with a mixed-integer check of λ_q), short closed-loop checks of the rules, and the tests of the simulation core (`test_core_*.py`) |
+| `configs/` | Reference configuration of the Kegeyli pool and the Dustlik node, and the scenario files of the cases (`sensor_udl`, `design_geometry`, `communication_loss`, `tailwater_high`, `manning_low` and `manning_high` are used only by the tests of the core) |
+| `DATA/processed/` | Daily operating records 2010–2019 (supply at the Kegeyli head), the decadal demand of the node and the records it is derived from (`DATA/processed/README.md`) |
+| `DATA/raw/nasa_power/` | Hourly irradiance (NASA POWER) for the solar energy balance of the full IoT chain |
+| `results/runs/` | One table per (case, rule, season): daily plan, executed target, delivered and estimated volumes, openings and pulses of every outlet, with a `.meta.json` file (environment, code and input checksums, configuration) |
+| `results/analysis/` | Summary tables of the theorem checks (CSV and Markdown) |
+| `results/figures/` | Figures of the article (PNG and PDF) |
+| `results/inputs/` | Derived inputs of the case (`derived_inputs.json`) |
+| `results/verification/` | Verification of the plant (convergence, single pulse, EPA SWMM benchmark) |
 
-Without the operating records (see *Data*), *Run the model* uses the synthetic inputs of `DATA/synthetic/`.
+## Cases
 
-## Data
+| Case | Scenario | Execution chain | Rules |
+|---|---|---|---|
+| `phys` | baseline | ideal execution | LXB |
+| `q_main` | baseline | quantised actuator only (the setting of Theorems 1–4) | LXB, LXB-T000, LXB-T050, LXB-ES, LXB-CO |
+| `q_theta` | baseline | quantised actuator only | LXB-T025, LXB-T075 |
+| `iot_main` | baseline | full IoT chain (sensor, actuator, communication, energy) | LXB, LXB-T000, LXB-T050, LXB-ES, LXB-CO |
+| `q_deadband_low`, `q_deadband_high` | deadband 0.25% and 1% of the travel (k = 3 and 10) | quantised actuator only | LXB |
+| `q_cd_low`, `q_cd_high` | gate coefficient −20% and +20% | quantised actuator only | LXB |
+| `q_leak_005mm` | regulators leak as through a 0.05 mm opening | quantised actuator only | LXB |
+| `q_rating` | outlet-specific rating errors (±10%), unknown to the controller | quantised actuator only | LXB-T050, LXB-CO |
 
-| Folder | Content | In this repository |
-|---|---|---|
-| `DATA/raw/nasa_power/` | hourly NASA POWER irradiance at the node, used by the energy model | yes (open data) |
-| `DATA/synthetic/` | generated supply and demand with the structure of the records (`scripts/make_synthetic_inputs.py`) | yes |
-| `DATA/processed/` | daily head discharge 2010–2019, decadal demand at the node, official 2021 limit profile, and the 2020 dispatcher sheets of the Kegeyli canal, transcribed from the operating records of the irrigation system (`DATA/processed/README.md`) | yes |
+LXB is floor rounding (the requested volume never exceeds the remaining plan); `LXB-T050` coincides with the
+deadband-aware rule LXB-DA of the simulation core (checked in `tests/test_rules_closed_loop.py`).
 
-The processed operating records are those used by every reported run; their SHA-256 checksums are stored in the
-`.meta.json` file of every result and are checked by `scripts/check_results.py`. The original record sheets are not
-included.
+## Running
 
-## Installation and tests
+Python 3.13 with the packages of `requirements.txt`:
 
-```bash
-python -m pip install -r requirements.txt          # pinned numpy, scipy, pandas, PyYAML, pytest; matplotlib
-python -m pytest -q
-```
+    python -m pip install -r requirements.txt
+    python -m pytest -q                                   # theory and closed-loop checks
+    python scripts/run_cases.py --phases A,B,C            # 200 seasonal runs, about 3 min each on one core;
+                                                          # several instances may run at once
+    python scripts/analyse_theorems.py                    # summary tables
+    python scripts/make_figures.py                        # figures
+    python scripts/verification_convergence.py            # verification of the plant (also with --eta 0.81),
+    python scripts/verification_pulse.py                  # single pulse,
+    python scripts/check_swmm_benchmark.py                # EPA SWMM 5 benchmark (needs swmm-toolkit)
 
-The tests use the operating records in `DATA/processed/`; without them (for example in a copy without the data
-folder), they use the synthetic inputs, and the test of the official 2021 limit profile is skipped. The tests cover the hydraulic plant (mass balance, steady profiles,
-grid convergence), the lexicographic linear programs, the controllers, the IoT layer, the statistics and decision
-rules, provenance and determinism (Table S2 of the Supplementary Materials).
+A stored result is never recomputed; delete it to repeat a run. Each `.meta.json` records the checksum of the code
+(`code_sha256`: `src/**/*.py`), of the unchanged core (`core_sha256`), of the rules and of the runner, the checksums of
+the input files and the active configuration.
 
-## Reproducing the results
+## Licence
 
-Every run writes one CSV per controller × season × chain with a `.meta.json` file that records the software
-environment, the active configuration, and the SHA-256 checksums of the source code and of the inputs.
-
-Three levels of reproduction are possible. (1) Integrity: `check_results.py --all` checks that every stored result is
-complete, numerically valid (finite satisfactions in [0, 1], non-negative volumes, mass error, retained optima,
-packet counters) and was computed with the current code and inputs. (2) Evaluation: the hypothesis tests, the
-exploratory comparisons, the tables and the figures are recomputed from the stored daily results. (3) Simulation:
-every season is rerun from the operating records in `DATA/processed/`.
-
-From the stored results:
-
-```bash
-python scripts/make_results_tables.py          # Tables 6-8, S6, S7 and the numbers of the text -> results/tables/
-python scripts/fig_results.py                  # Figures 4-6 -> results/figures/
-python scripts/fig_methods.py                  # Figures 1-3 -> results/figures/
-```
-
-Without `DATA/processed/`, `make_results_tables.py` skips the quantities that need the demand file (the
-demand-floor checks, the demand of the outlet R-1 and the delivered volume relative to the demand). The hypothesis
-tests (`evaluate_hypotheses.py`) also run from the stored results; H6 needs the supply records and is reported as not
-available without them.
-
-With the operating records in `DATA/processed/`:
-
-```bash
-python scripts/run_experiment.py --verify --years 2018 --methods LXB --tuned tuned --iot iot
-                                               # reruns one stored season and compares it with the stored file
-python scripts/run_experiment.py --all --jobs 4            # main runs: 240 + 140 Shapley + 10 ablation
-python scripts/run_experiment.py --sensitivity --jobs 4    # sensitivity runs -> results/sensitivity/
-python scripts/run_experiment.py --exploratory --jobs 4    # exploratory runs -> results/exploratory/
-python scripts/check_results.py --all --write              # completeness, identical code and inputs, manifest
-python scripts/evaluate_hypotheses.py                      # H1-H7 -> results/hypotheses_summary_normal.csv
-python scripts/evaluate_hypotheses.py --bootstrap circular # bootstrap variants (also: season, calendar)
-python scripts/evaluate_hypotheses.py --bootstrap season --inference season   # seasons as the units of inference
-python scripts/evaluate_hypotheses.py --scenario block_5 --data normal
-python scripts/evaluate_hypotheses.py --scenario block_20 --data normal
-python scripts/summarize_sensitivity.py                    # -> results/sensitivity_summary.csv
-python scripts/summarize_exploratory.py                    # -> results/exploratory_summary.csv
-python scripts/compare_exploratory.py                      # -> results/exploratory_tests.csv (same options)
-python scripts/verification_convergence.py                 # grid and time-step convergence (Table S2a)
-python scripts/verification_pulse.py                       # gate pulse vs hydraulic step (Table S2b)
-```
-
-A season takes about 2 min for B0, B1 and B3 and about 8 min for B2, LXB and the Oracle on one core; an existing result
-is kept only if its metadata show the current code and inputs and its table is complete (a table appears only after
-its metadata), so an interrupted sweep resumes where it stopped and results of other versions are recomputed. Linear-program solutions can differ at the level
-of the solver tolerance between platforms and solver versions; in the environment of `requirements.txt`, a stored season
-computed under Windows was reproduced under Linux to 4 × 10⁻¹⁶ in λ and 2 × 10⁻⁹ m³ in the delivered volumes
-(`results/verification/rerun/comparison.csv`).
-
-Every result records the checksum of the code that computed it. `check_results.py` requires every run to come from
-the current code and the current version of every recorded input; with `--accept-listed`, runs of earlier versions
-are accepted if each version is listed in `results/versions.json`, together with the evidence that the later version
-reproduces the earlier results. Evaluation outputs record the checksum of the whole code base and of the daily results
-they were computed from (`.meta.json`, `results/tables/PROVENANCE.json`). The bootstrap schemes are: `block` (pre-specified; 10-day moving blocks
-within each season), `circular`, `season` (whole seasons) and `calendar` (moving blocks on the full calendar of each
-season; excluded days stay in place and are left out of the replicate means).
-
-The hypotheses, metrics and decision rules were fixed before the simulation runs. The protocol is
-`requirements/hypotheses.md` (original language; its SHA-256 is recorded in `results/experiment/PREREGISTRATION.json`
-and checked before every run), with an English translation in `requirements/hypotheses_en.md`.
-
-## Repository layout
-
-```
-src/water01/
-    domain/        configuration (reference + scenario), parameter registry with status and source, geometry, state
-    hydraulics/    Saint-Venant equations, Preissmann solver, gate equations and the Dustlik node
-    optimization/  daily lexicographic LP (stages 1, 1b, 2, 3) and the 15-min execution LP
-    iot/           devices, quantisation and deadband, measurement model, packet budget, energy balance
-    control/       controllers B0, B1, B2, B3, B3V, B3V-DA, LXB, LXB-F, LXB-DA, LXB-noS3, Oracle
-    simulation/    closed loop, scenarios, runner, provenance (.meta.json)
-    evaluation/    metrics, price, Shapley values, statistics, decision rules
-configs/           kegeyli_reference.yaml (every parameter: value, status observed/derived/assumed/setting, source)
-                   scenarios/*.yaml (sensitivity, stress and exploratory cases)
-requirements/      hypothesis protocol and its English translation
-scripts/           experiment, evaluation, summaries, tables, figures, verification, synthetic inputs
-tests/             automated tests (pytest)
-app/               graphical interface (Streamlit)
-results/           daily result files with .meta.json, summaries, manifest, tables and figures
-DATA/              open NASA POWER irradiance and synthetic inputs
-```
-
-## Citation and licence
-
-Please cite the article and this repository (`CITATION.cff`). The code is released under the MIT License (`LICENSE`);
-the results, configuration and synthetic inputs under CC BY 4.0 (`LICENSE-DATA.md`).
-
-Contact: Adilbay Kudaybergenov, Karakalpak State University named after Berdakh, Nukus, Uzbekistan
-(q_adilbay@karsu.uz).
+Code: MIT (`LICENSE`). Configuration, processed records and results: CC BY 4.0 (`LICENSE-DATA.md`).

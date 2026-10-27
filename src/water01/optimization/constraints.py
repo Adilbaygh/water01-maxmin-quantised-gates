@@ -114,14 +114,31 @@ def is_convex(breakpoints, values, tol=1e-9):
     return bool(np.all(np.diff(beta) >= -tol))
 
 
-def command_limit(breakpoints, values, h_ref, f_ref, slope_ref):
-    """LP form of (9), chosen according to the shape of f_j(h); always conservative (q ≤ ... ≤ f):
+def command_limit(breakpoints, values, h_ref, f_ref, slope_ref, mixed="error"):
+    """LP form of (9), chosen according to the shape of f_j(h) at the breakpoints (q ≤ ... ≤ f):
     - concave f (regulators with constant tailwater level): chords, min_m(α_m + β_m h);
     - convex f (check structure: tailwater rises with discharge): a single tangent at h_ref,
       f(h_ref) + f′(h_ref)(h − h_ref); the tangent of a convex function lies below it.
-    If f is neither, an error is raised (a conservative linear form is not guaranteed)."""
+    If f is neither, an error is raised (mixed="error"), or the tangent is returned (mixed="tangent"); the caller
+    must then make it conservative (lower_to_function)."""
     if is_concave(breakpoints, values):
         return chords(breakpoints, values)
-    if is_convex(breakpoints, values):
+    if is_convex(breakpoints, values) or mixed == "tangent":
         return np.array([f_ref - slope_ref * h_ref]), np.array([slope_ref])
     raise ValueError("f_j(h) is neither concave nor convex: a conservative linear constraint is not guaranteed")
+
+
+def lower_to_function(alpha, beta, grid, true, iterations=20):
+    """Lowers the lines (α_m, β_m) of min_m(α_m + β_m h) until the minimum does not exceed the function values `true`
+    on `grid`: each line that is the active minimum where the minimum exceeds the function is lowered by its largest
+    excess there. Returns the new α."""
+    alpha = np.array(alpha, float); beta = np.asarray(beta, float)
+    for _ in range(iterations):
+        vals = alpha[:, None] + beta[:, None] * grid[None, :]
+        excess = vals.min(axis=0) - true
+        if excess.max() <= 1e-12:
+            break
+        active = vals.argmin(axis=0)
+        for mm in np.unique(active[excess > 1e-12]):
+            alpha[mm] -= excess[(active == mm) & (excess > 1e-12)].max()
+    return alpha

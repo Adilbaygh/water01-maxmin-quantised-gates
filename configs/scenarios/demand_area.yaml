@@ -1,5 +1,0 @@
-meta:
-  name: demand_area
-  description: "Sensitivity: demand variant B, proportional to the irrigated area (Table S3)"
-overrides:
-  demand_variant: {value: "B", status: setting, source: "Table S3"}

@@ -1,0 +1,5 @@
+meta:
+  name: gate_leak_005mm
+  description: "Exploratory (gate model, plant only): the five regulators leak as through an opening of 0.05 mm when closed or almost closed; the controller's model assumes gates that seal"
+additions:
+  gate_leakage_opening_m: {value: 5.0e-5, status: assumed, source: "equivalent leakage opening of the regulator seals (not measured)"}
