@@ -7,7 +7,8 @@ closed gate and the travel (sum of the absolute changes of the opening, in units
 the re-run reproduces the stored daily volumes. The closed loop of this case is deterministic.
 
 Output: results/analysis/gate_activity_runs/<method>_<season>.csv (one row per day and outlet) and, after all
-seasons, results/analysis/gate_activity.csv and .md (means per regulator-day by method and regulator).
+seasons, results/analysis/gate_activity.csv and .md (means per regulator-day with a positive plan, x > 1e-6 m3, by
+method and regulator).
 
 Usage:
     python scripts/gate_activity.py                 # all jobs, resumable
@@ -43,6 +44,7 @@ from analysis_common import markdown  # noqa: E402
 CASE = "q_main"
 OUT = ROOT / "results/analysis/gate_activity_runs"
 TOL = 1e-6                                   # m3, reproduction of the stored daily volumes
+EPS = 1e-6                                   # m3, smallest positive plan, as in scripts/analyse_theorems.py
 
 
 def job_path(method, year):
@@ -93,7 +95,7 @@ def summary():
     if not files:
         return None
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
-    reg = df[df.user.isin(USERS[:5]) & (df.x > 0)]
+    reg = df[df.user.isin(USERS[:5]) & (df.x > EPS)]          # residues of the programs count as zero plans
     rows = []
     for method, g in reg.groupby("method", sort=False):
         r = {"method": method, "seasons": g.year.nunique(), "regulator_days": len(g),
@@ -108,7 +110,8 @@ def summary():
     s = s.sort_values("method", key=lambda c: c.map(order)).reset_index(drop=True)
     s.to_csv(ROOT / "results/analysis/gate_activity.csv", index=False)
     (ROOT / "results/analysis/gate_activity.md").write_text(
-        "Gate activity, quantised actuator (q_main): means per regulator-day with a positive plan.\n\n"
+        "Gate activity, quantised actuator (q_main): means per regulator-day with a positive plan "
+        "(x > 1e-6 m3).\n\n"
         + markdown(s), encoding="utf-8")
     return s
 
