@@ -16,15 +16,21 @@ authors:
   - family-names: Kazimbetova
     given-names: Mukhabbad
     affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
+  - family-names: Shikhiyev
+    given-names: Rakhim
+    affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
+  - family-names: Urazimbetova
+    given-names: Elzura
+    affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
   - family-names: Ametova
     given-names: Gulsara
     affiliation: '"Tashkent Institute of Irrigation and Agricultural Mechanization Engineers" National Research University, Tashkent, Uzbekistan'
   - family-names: Ispanova
     given-names: Jadira
     affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
-  - family-names: Shikhiyev
-    given-names: Rakhim
-    affiliation: 'Karakalpak State University named after Berdakh, Nukus, Uzbekistan'
+  - family-names: Bektursınova
+    given-names: Dilnura
+    affiliation: 'Nukus State Technical University, Nukus, Uzbekistan'
 keywords:
   - max-min fairness
   - quantised control
@@ -43,11 +49,15 @@ preferred-citation:
       given-names: Anvar
     - family-names: Kazimbetova
       given-names: Mukhabbad
+    - family-names: Shikhiyev
+      given-names: Rakhim
+    - family-names: Urazimbetova
+      given-names: Elzura
     - family-names: Ametova
       given-names: Gulsara
     - family-names: Ispanova
       given-names: Jadira
-    - family-names: Shikhiyev
-      given-names: Rakhim
+    - family-names: Bektursınova
+      given-names: Dilnura
   journal: "Water"
   year: 2026
