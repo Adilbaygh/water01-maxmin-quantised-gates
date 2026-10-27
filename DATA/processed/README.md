@@ -12,6 +12,7 @@ records. Licence: CC BY 4.0 (`LICENSE-DATA.md`).
 | `plan_2021_kegeyli_decadal.csv` | Decadal plan of the Kegeyli system for the 2021 vegetation season (rows "total", "irrigation" and "other uses" of the plan): mean discharge of each decade (`plan_Q_m3s` = `irrigation_Q_m3s` + `other_Q_m3s`), the planning reference of the demand |
 | `dispatcher_2020_kegeyli.csv` | Morning dispatcher sheets of 2020 (January–August): Dustlik and Kegeyli heads as above, the Abad-Yarmish regulator (`abad_yarmysh_Q`), the Kokshiel off-take (`kokshiel_Q`), the gauge immediately upstream of the Dustlik node (`pg_dustlik_Q`), the gauge below the node (`below_dostlik_Q`) and the Kokozek off-take; source of the delivery factor η and of the monthly share of the Abad-Yarmish regulator |
 | `annual_volumes_2010_2019.csv` | Officially reported annual volumes, 10⁶ m³, at the heads of the Dustlik and Kegeyli canals, at the Kuanyshjarma head and at the Kokozek off-take; used only to check the transcription of the daily records |
+| `annual_summary_2011_monthly.csv` | Monthly volumes, 10⁶ m³, of the annual summary of the 2011 record book, whose totals are the 2011 row of `annual_volumes_2010_2019.csv`; its May entry disagrees with the May sheet of the same book (the daily records), which explains the 2011 difference |
 
 The simulations read `rashod_2010_2019_daily.csv` and `demand_decadal.csv`; their SHA-256 checksums are stored in the
 `.meta.json` file of every result. `python scripts/derive_inputs.py` recomputes, from the other three files, the

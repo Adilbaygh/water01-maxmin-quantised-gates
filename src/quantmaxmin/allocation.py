@@ -11,10 +11,14 @@ max{t D_j, q_j}, so lambda_q = max{t in [0, 1] : G(t) <= V} with G(t) = sum_j ma
 and lambda_q = 0 otherwise. lambda_q is the minimum-delivery level: it keeps the smallest positive delivery q_j but not
 the grid of whole steps above it.
 
-Whole steps (Theorem 2(c)). At a constant level, a gate that starts the day closed delivers 0 or q_j + m v_j,
-m = 0, 1, ..., where v_j is the volume of one resolution step. The whole-step level lambda_v is lambda_q with the
-positive deliveries restricted to this grid; an outlet with v_j = 0 is not restricted (q_j = v_j = 0: no quantum).
-If the outlets without a quantum have the demand D_0 > 0, then lambda_q - sum_j v_j / D_0 <= lambda_v <= lambda_q.
+Whole steps (Theorem 2(c)). The whole-step level lambda_v is the max-min level when outlet j delivers a volume of
+the set S_j of volumes that it can deliver in a day. If every S_j contains 0 and, for every q_j <= y <= max{D_j, q_j},
+a volume of [y, y + v_j], then lambda_v >= tau for every tau in (0, lambda_q] with
+sum_j v_j <= (lambda_q - tau) * D_q(tau), where D_q(tau) is the demand of the outlets with q_j <= tau D_j
+(whole_step_lower_bound); if no S_j has a positive volume below q_j, also lambda_v <= lambda_q. At a constant level,
+a gate whose discharge is proportional to the opening and that starts the day closed has the grid
+S_j = {0} U {q_j + m v_j, m = 0, 1, ...}, v_j being the volume of one resolution step; whole_step_level computes
+lambda_v for such grids, an outlet with v_j = 0 taking every volume of at least q_j.
 """
 import numpy as np
 
@@ -132,6 +136,29 @@ def whole_step_level(V, D, q, v, tol=1e-13):
         mid = 0.5 * (lo + hi)
         lo, hi = (mid, hi) if G(mid) <= V else (lo, mid)
     return lo
+
+
+def whole_step_lower_bound(V, D, q, v):
+    """Lower bound of Theorem 2(c): the largest tau in (0, lambda_q] with sum_j v_j <= (lambda_q - tau) D_q(tau),
+    D_q(tau) = sum of D_j over the outlets with q_j <= tau D_j, or 0 if there is none. For such tau, every outlet of
+    D_q(tau) needs t D_j on [tau, lambda_q], so G(tau) <= G(lambda_q) - (lambda_q - tau) D_q(tau), and raising every
+    delivery to a deliverable volume costs at most sum_j v_j. The candidates are tau = lambda_q - sum v / D_q(s) for
+    the sets of outlets with q_j / D_j <= s, s a breakpoint; a candidate is valid if it is not below s."""
+    D, q = _arrays(D, q)
+    v = np.asarray(v, float)
+    if v.shape != D.shape or np.any(v < 0):
+        raise ValueError("v must be a non-negative array of the length of D")
+    lq = quantised_level(V, D, q)
+    sv = float(v.sum())
+    if lq <= 0.0 or sv == 0.0:
+        return lq
+    b = q / D
+    best = 0.0
+    for s in np.unique(b[b <= lq]):
+        tau = lq - sv / D[b <= s].sum()
+        if tau >= s and tau > best:
+            best = tau
+    return float(best)
 
 
 def whole_step_level_enumerated(V, D, q, v):

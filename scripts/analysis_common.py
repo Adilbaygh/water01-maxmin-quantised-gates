@@ -51,6 +51,7 @@ class Quanta:
         self.dt = float(value("dt_s"))
         self.node = DustlikNode()
         self.amax = np.asarray(self.node.max_opening, float)[:5]
+        self._bar = {}
 
     def volume(self, h, steps):
         a = steps * self.res * self.amax
@@ -64,6 +65,19 @@ class Quanta:
 
     def p(self, h):
         return self.volume(h, self.k + 1)
+
+    def barrier(self, h):
+        """Step volumes of the barrier (check structure) at the level h, over the whole travel: the quantum from the
+        closed position q = Q(k rho) dt, the largest volume of one resolution step v = max_n (Q((n+1) rho) - Q(n rho)) dt
+        and the volume of the fully open gate in one step C. The barrier discharge is not proportional to the opening,
+        because its tail water rises with the discharge; v is taken at small openings, where the head is largest."""
+        key = round(float(h), 6)
+        if key not in self._bar:
+            r6 = self.res * float(self.node.max_opening[5])
+            Q = np.array([self.node.barrier(float(h), i * r6) for i in range(int(round(1 / self.res)) + 1)])
+            self._bar[key] = {"q": float(Q[self.k] * self.dt), "v": float(np.diff(Q).max() * self.dt),
+                              "C": float(Q[-1] * self.dt)}
+        return self._bar[key]
 
     def table(self, h_values):
         """Quanta at an array of levels: dict of arrays [len(h) x 5]."""

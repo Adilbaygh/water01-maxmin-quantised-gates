@@ -25,9 +25,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from analysis_common import (OUT, REGULATORS, YEARS, Quanta, available, load, markdown, node_water,
+from analysis_common import (OUT, REGULATORS, ROOT, YEARS, Quanta, available, load, markdown, node_water,
                              regulator_days)
-from quantmaxmin.allocation import continuous_level, quantised_level, whole_step_level
+from quantmaxmin.allocation import continuous_level, quantised_level, whole_step_level, whole_step_lower_bound
 
 THETA = {"LXB-T000": 0.0, "LXB-T025": 0.25, "LXB-T050": 0.5, "LXB-T075": 0.75, "LXB-ES": 0.5, "LXB-CO": 0.5}
 CASE_SCENARIO = {"phys": "normal", "q_main": "normal", "q_theta": "normal", "iot_main": "normal",
@@ -72,6 +72,10 @@ def part_quanta():
     _, _, D = node_water(2010)
     df["D_min_m3"] = D[:5].min(axis=1); df["D_max_m3"] = D[:5].max(axis=1)
     df["D_min_over_q_lo"] = df["D_min_m3"] / df["q_lo_m3"]
+    # varying level within a day (Appendix A, proof of Theorem 2(c)): the largest volume y = max{D, q_hi} that the
+    # lower bound asks of a regulator is requested with half a step added, y + v_hi / 2, which must fit the equal split
+    df["largest_shifted_target_m3"] = np.maximum(df["D_max_m3"], df["q_hi_m3"]) + 0.5 * df["v_hi_m3"]
+    df["varying_level_ok"] = df["C_ge_2q_3v"] & (df["largest_shifted_target_m3"] <= df["es_upper_limit_m3"])
     save(df, "step_volumes", "Step volumes of the regulators (one resolution step v, quantum q = k v, pulse p = (k + 1) v; "
          "levels: lo = lower operating level, norm = normal level, hi = upper operating level)")
 
@@ -143,65 +147,95 @@ def mean_err_same_days(case, es_days):
 
 # Theorem 2 -----------------------------------------------------------------------------------------------------------
 def part_t2():
+    """Theorem 2 at the node. Daily lambda*, the minimum-delivery level lambda_q and Pi_ind with the quanta of the upper
+    operating level, for the six outlets with the barrier from the closed position (its quantum) and without it; at
+    every level of the operating range in steps of 1 cm, the lower bound of Theorem 2(c), which holds for every gate
+    that delivers a volume in each interval of one step above its quantum (the barrier with its largest one-step
+    volume, Appendix A), and the whole-step level lambda_v with all six outlets on grids; for comparison lambda_v with
+    a barrier that takes any volume. On the days without deficit, the margin of the supply over max{D_j, q_j} plus one
+    step of every outlet; the condition of Theorem 2(c) for the barrier at a constant level."""
     qa = Quanta("normal")
     h_hi = float(qa.cfg.params["H_max_m"].value) - float(qa.cfg.freeboard_m)
     h_lo = float(qa.cfg.params["h_min_operating_m"].value)
-    q_hi = np.r_[qa.q(h_hi), 0.0]                                 # check structure: no quantum
-    q_lo = np.r_[qa.q(h_lo), 0.0]
-    v_hi = np.r_[qa.v(h_hi), 0.0]; v_lo = np.r_[qa.v(h_lo), 0.0]   # one resolution step (whole-step grid)
+
+    def six(h):                                               # quanta and step volumes of the six outlets at level h
+        b = qa.barrier(h)
+        return np.r_[qa.q(h), b["q"]], np.r_[qa.v(h), b["v"]]
+
+    q_hi, v_hi = six(h_hi); q_lo, v_lo = six(h_lo)
+    q_hi0 = np.r_[qa.q(h_hi), 0.0]                            # barrier without a quantum
     grid_levels = np.round(np.arange(h_lo, h_hi + 1e-9, 0.01), 2)  # operating range in steps of 1 cm
-    grid_qv = [(np.r_[qa.q(h), 0.0], np.r_[qa.v(h), 0.0]) for h in grid_levels]
-    rows = []
+    grid_qv = [six(h) for h in grid_levels]
+    rows = []; margins = []; d6_max = 0.0
     ref = {y: load("q_main", "LXB-T050", (y,)) for y in YEARS}
     for y in YEARS:
         dates, A, D = node_water(y)
         hmax = ref[y]["h_max"].to_numpy() if not ref[y].empty else np.full(len(dates), np.nan)
         for p, d in enumerate(dates):
-            q_day = np.r_[qa.q(hmax[p]), 0.0] if np.isfinite(hmax[p]) else q_hi
-            lam = continuous_level(A[p], D[:, p])
-            lq = quantised_level(A[p], D[:, p], q_hi)
-            lq_day = quantised_level(A[p], D[:, p], q_day)
-            lv_hi = whole_step_level(A[p], D[:, p], q_hi, v_hi) if A[p] > 0 else 0.0
-            lv_lo = whole_step_level(A[p], D[:, p], q_lo, v_lo) if A[p] > 0 else 0.0
-            lv_all = [whole_step_level(A[p], D[:, p], q, v) for q, v in grid_qv] if A[p] > 0 else [0.0]
-            lv_range = min(lv_all)
-            ok_range = all(lv <= quantised_level(A[p], D[:, p], q) + 1e-12
-                           and lv >= quantised_level(A[p], D[:, p], q) - v.sum() / D[5, p] - 1e-12
-                           for lv, (q, v) in zip(lv_all, grid_qv)) if A[p] > 0 else True
-            rows.append({"year": y, "date": d.date(), "V_m3": A[p], "sumD_m3": D[:, p].sum(), "lambda_star": lam,
-                         "lambda_q": lq, "Pi_ind": lam - lq, "Pi_ind_day_level": lam - quantised_level(
-                             A[p], D[:, p], q_day), "bound_sum_q_over_sum_D": q_hi.sum() / D[:, p].sum(),
-                         "R1_demand_below_quantum": bool(D[1, p] < q_hi[1]), "lambda_q_day": lq_day,
-                         "sum_qmin_exceeds_V": bool(A[p] < q_lo.sum()),
-                         "lambda_v_hi": lv_hi, "lambda_v_lo": lv_lo, "lambda_v_min_range": lv_range,
-                         "bracket_ok_range": bool(ok_range),
-                         "bound_steps_hi": v_hi.sum() / D[5, p], "lambda_q_lo": quantised_level(A[p], D[:, p], q_lo)})
+            Dp = D[:, p]
+            d6_max = max(d6_max, float(Dp[5]))
+            if A[p] > 0 and A[p] >= Dp.sum():                    # no deficit: room for one more step at every outlet
+                margins.append(A[p] - np.maximum(Dp, q_hi).sum() - v_hi.sum())
+            q_day = six(hmax[p])[0] if np.isfinite(hmax[p]) else q_hi
+            lam = continuous_level(A[p], Dp)
+            lq = quantised_level(A[p], Dp, q_hi)
+            r = {"year": y, "date": d.date(), "V_m3": A[p], "sumD_m3": Dp.sum(), "lambda_star": lam,
+                 "lambda_q": lq, "Pi_ind": lam - lq, "Pi_ind_barrier_without_quantum": lam - quantised_level(A[p], Dp, q_hi0),
+                 "Pi_ind_day_level": lam - quantised_level(A[p], Dp, q_day),
+                 "bound_sum_q_over_sum_D": q_hi.sum() / Dp.sum(),
+                 "R1_demand_below_quantum": bool(Dp[1] < q_hi[1]),
+                 "sum_qmin_exceeds_V": bool(A[p] < q_lo.sum()), "lambda_q_lo": quantised_level(A[p], Dp, q_lo)}
+            if A[p] > 0:
+                lv, lb, lqs, lv_reg = [], [], [], []
+                for q, v in grid_qv:
+                    lqs.append(quantised_level(A[p], Dp, q))
+                    lv.append(whole_step_level(A[p], Dp, q, v))
+                    lb.append(whole_step_lower_bound(A[p], Dp, q, v))
+                    lv_reg.append(whole_step_level(A[p], Dp, np.r_[q[:5], 0.0], np.r_[v[:5], 0.0]))
+                lv, lb, lqs = np.array(lv), np.array(lb), np.array(lqs)
+                r.update({"lambda_v_min_range": float(lv.min()), "lambda_v_regulators_min_range": float(min(lv_reg)),
+                          "loss_bound_max_range": float((lqs - lb).max()),
+                          "bracket_ok_range": bool(np.all((lb - 1e-12 <= lv) & (lv <= lqs + 1e-12)))})
+            else:
+                r.update({"lambda_v_min_range": 0.0, "lambda_v_regulators_min_range": 0.0, "loss_bound_max_range": 0.0,
+                          "bracket_ok_range": True})
+            rows.append(r)
     daily = pd.DataFrame(rows)
     OUT.mkdir(parents=True, exist_ok=True)
     daily.to_csv(OUT / "theorem2_daily.csv", index=False)
     sup = daily[daily["V_m3"] > 0]; defi = sup[sup["lambda_star"] < 1]
-    gap_hi = sup["lambda_star"] - sup["lambda_v_hi"]; gap_lo = sup["lambda_star"] - sup["lambda_v_lo"]
-    bracket = ((sup["lambda_v_hi"] <= sup["lambda_q"] + 1e-12)
-               & (sup["lambda_v_hi"] >= sup["lambda_q"] - sup["bound_steps_hi"] - 1e-12))
-    gap_range = sup["lambda_star"] - sup["lambda_v_min_range"]
+    gap = sup["lambda_star"] - sup["lambda_v_min_range"]
+    gap_reg = sup["lambda_star"] - sup["lambda_v_regulators_min_range"]
+    b_lo, b_hi = qa.barrier(h_lo), qa.barrier(h_hi)
+    n_steps = round(86400 / qa.dt)
+    # condition of Theorem 2(c) for the barrier at a constant level (Appendix A): one fully open step C >= 2 q, and
+    # the daily volumes meet [y, y + v] for every q <= y <= (N - 3) C; the extreme values over the operating range
+    cover = (n_steps - 3) * b_lo["C"]
     ws = pd.DataFrame([{"supply_days": int(len(sup)), "deficit_days_with_supply": int(len(defi)),
+                        "barrier_C_lo_m3": b_lo["C"], "barrier_cover_m3": cover, "max_D6_m3": d6_max,
+                        "barrier_condition_ok": bool(b_lo["C"] >= 2 * b_hi["q"] and d6_max <= cover),
+                        "no_deficit_min_margin_m3": float(min(margins)),
                         "levels": int(len(grid_levels)), "level_step_m": 0.01,
-                        "max_gap_range": float(gap_range.max()),
+                        "max_gap_range": float(gap.max()), "mean_gap_range_all_days": float(gap.sum() / len(daily)),
+                        "max_gap_range_regulators": float(gap_reg.max()),
+                        "max_loss_bound_range": float(sup["loss_bound_max_range"].max()),
+                        "max_loss_bound_deficit": float(defi["loss_bound_max_range"].max()),
+                        # guaranteed loss lambda* - lambda_v: the bound on the deficit days, zero on the other days
+                        "mean_loss_bound_all_days": float(defi["loss_bound_max_range"].sum() / len(daily)),
                         "no_deficit_days_lambda_v_below_1_range": int(((sup["lambda_star"] >= 1)
                                                                        & (sup["lambda_v_min_range"] < 1)).sum()),
-                        "max_gap_hi": float(gap_hi.max()), "max_gap_lo": float(gap_lo.max()),
-                        "mean_gap_hi": float(gap_hi.mean()), "days_gap_pos_hi": int((gap_hi > 1e-12).sum()),
-                        "no_deficit_days_lambda_v_below_1": int(((sup["lambda_star"] >= 1) & (sup["lambda_v_hi"] < 1)
-                                                                 ).sum()),
-                        "max_bound_steps_deficit": float(defi["bound_steps_hi"].max()),
-                        "max_bound_steps_supply": float(sup["bound_steps_hi"].max()),
-                        "bracket_holds_days": int(bracket.sum()),
                         "bracket_holds_days_range": int(sup["bracket_ok_range"].sum()),
+                        "max_Pi": float(sup["Pi_ind"].max()),
+                        "max_Pi_barrier_without_quantum": float(sup["Pi_ind_barrier_without_quantum"].max()),
                         "max_Pi_lo": float((sup["lambda_star"] - sup["lambda_q_lo"]).max()),
-                        "sum_v_hi_m3": float(v_hi.sum()), "sum_v_lo_m3": float(v_lo.sum())}])
-    save(ws, "theorem2_whole_steps", "Theorem 2(c): whole-step level lambda_v of the node against lambda* at the levels of "
-         "the operating range in steps of 1 cm (range), at its upper (hi) and lower (lo) end, and the bound "
-         "lambda_q - sum v / D_barrier (days with supply)")
+                        "barrier_q_lo_m3": b_lo["q"], "barrier_q_hi_m3": b_hi["q"],
+                        "barrier_v_lo_m3": b_lo["v"], "barrier_v_hi_m3": b_hi["v"],
+                        "sum_v_hi_m3": float(v_hi.sum()), "sum_v_hi_regulators_m3": float(v_hi[:5].sum()),
+                        "min_sumD_deficit_m3": float(defi["sumD_m3"].min())}])
+    save(ws, "theorem2_whole_steps", "Theorem 2(c) at the node: lower bound of the whole-step level of the six outlets "
+         "(the barrier with its quantum and largest one-step volume) and lambda_v with all outlets on grids, against "
+         "lambda* and lambda_q at the levels of the operating range in steps of 1 cm (days with supply); lambda_v with a "
+         "barrier that takes any volume for comparison; the condition of Theorem 2(c) for the barrier")
     summ = daily.groupby("year").agg(days=("date", "size"), deficit_days=("lambda_star", lambda s: int((s < 1).sum())),
                                      Pi_pos_days=("Pi_ind", lambda s: int((s > 1e-12).sum())),
                                      Pi_max=("Pi_ind", "max"), Pi_mean=("Pi_ind", "mean"),
@@ -215,7 +249,8 @@ def part_t2():
                          "R1_below_quantum_days": int(summ["R1_below_quantum_days"].sum()),
                          "sum_qmin_exceeds_V_days": int(summ["sum_qmin_exceeds_V_days"].sum())}])
     save(pd.concat([summ, tot], ignore_index=True), "theorem2_summary",
-         "Theorem 2: price of indivisibility of the Dustlik node (quanta at the upper operating level)")
+         "Theorem 2: price of indivisibility of the Dustlik node (quanta at the upper operating level, the barrier from "
+         "the closed position)")
 
 
 # Node balance --------------------------------------------------------------------------------------------------------
@@ -293,12 +328,19 @@ def part_t3():
                     bad["case"] = case; bad["rule"] = m; bad["volume"] = vol
                     bad["lower_bound_m3"] = lower[~(ok_lo & ok_up)]; bad["upper_bound_m3"] = upper[~(ok_lo & ok_up)]
                     viol.append(bad)
+                n_pmin = round(86400 / qa.dt) * r["q_min"] * (qa.k + 1) / qa.k      # N p_min of the day
                 rows.append({"case": case, "rule": m, "theta": th, "volume": vol, "pulse_regime_days": int(pure.sum()),
+                             "days_x_ge_N_pmin": int((r["xt"] >= n_pmin).sum()),
+                             "days_after_day_open_throughout": int(r["prev_open_all_day"].sum()),
+                             "max_x_over_N_pmin": float((r["xt"] / n_pmin).max()) if len(r) else 0.0,
                              "lower_bound_holds": int(ok_lo.sum()), "upper_bound_holds": int(ok_up.sum()),
                              "days_x_ge_p": int(big.sum()), "sharp_upper_bound_holds": int(ok_sh.sum()),
                              "sharp_violations_after_day_open_throughout": int((~ok_sh & r["prev_open_all_day"]).sum()),
                              "sharp_max_excess_over_p": float(((r[vol] - upper_sharp) / r[pcol]).clip(lower=0).max())
                              if len(r) else 0.0,
+                             "sharp_max_excess_not_after_open_over_p":
+                                 float(((r[vol] - upper_sharp) / r[pcol]).clip(lower=0)[~r["prev_open_all_day"]].max())
+                                 if len(r) else 0.0,
                              "max_lower_violation_m3": float((lower - r[vol]).clip(lower=0).max()) if len(r) else 0.0,
                              "max_upper_violation_m3": float((r[vol] - upper).clip(lower=0).max()) if len(r) else 0.0,
                              "max_lower_violation_over_p": float(((lower - r[vol]).clip(lower=0) / r[pcol]).max())
@@ -474,13 +516,15 @@ def part_device():
          "pulse days, estimated against plant volumes, equal-split days outside half a resolution step")
 
 # Rules ---------------------------------------------------------------------------------------------------------------
-def dekad_errors(df, vol):
+def dekad_errors(df, vol, exclude=None):
     """|sum V - sum x| / sum D of R-1 over the calendar dekads (days 1-10, 11-20 and 21 to the end of the month; the
-    season of 183 days has 18 of them)."""
+    season of 183 days has 18 of them); with exclude, the dekads that contain one of these days are left out."""
     d = pd.DatetimeIndex(df["date"])
     key = d.year * 1000 + d.month * 10 + np.where(d.day <= 10, 0, np.where(d.day <= 20, 1, 2))
+    bad = df["date"].isin(exclude).to_numpy() if exclude is not None else np.zeros(len(df), bool)
     g = pd.DataFrame({"k": key, "V": df[f"{vol}_R-1"].to_numpy(), "x": df["x_R-1"].to_numpy(),
-                      "D": df["D_R-1"].to_numpy()}).groupby("k").sum()
+                      "D": df["D_R-1"].to_numpy(), "bad": bad.astype(int)}).groupby("k").sum()
+    g = g[g["bad"] == 0]
     return ((g["V"] - g["x"]).abs() / g["D"]).to_numpy()
 
 
@@ -546,13 +590,96 @@ def part_rules():
     save(pd.DataFrame(rows), "rules_outcome", "Outcome of the execution rules (regulators, all stored seasons)")
 
 
+# Records --------------------------------------------------------------------------------------------------------------
+def part_data():
+    """Operating records. (1) Blank Kegeyli head entries of the seasons, classified by the balance of the Dustlik
+    head: on the days with all records, (Kegeyli + Kuanyshjarma + Kokozek) / Dustlik has the median ratio r, so on a
+    blank day with the Dustlik and Kuanyshjarma records the Kegeyli discharge is about r Dustlik - Kuanyshjarma -
+    Kokozek. (2) The 2011 annual volume against the daily records, month by month (annual summary of the record book).
+    (3) The outcome of the rules with the blank days treated as missing instead of zero supply: the blank days and the
+    day after each run of blank days are left out (complete-case)."""
+    from analysis_common import SUP
+    rec = pd.read_csv(SUP, parse_dates=["date"])
+    s = rec[rec.date.dt.month.between(4, 9)].copy()
+    full = s.dropna(subset=["dostlik_Q", "kegeyli_Q", "kj_Q"])
+    full = full[full.dostlik_Q > 0]
+    ratio = (full.kegeyli_Q + full.kj_Q + full.kok_ozek_Q.fillna(0.0)) / full.dostlik_Q
+    r = float(ratio.median())
+    b = s[s.kegeyli_Q.isna()].copy()
+    implied = b.dostlik_Q * r - b.kj_Q - b.kok_ozek_Q.fillna(0.0)
+    both = b.dostlik_Q.notna() & b.kj_Q.notna()
+    rows = [{"blank_days": int(len(b)), "balance_ratio_median": r,
+             "balance_ratio_q25": float(ratio.quantile(0.25)), "balance_ratio_q75": float(ratio.quantile(0.75)),
+             "days_all_records": int(len(full)),
+             "head_and_kj_recorded": int(both.sum()),
+             "implied_le_2_m3s": int((both & (implied <= 2.0)).sum()),
+             "implied_gt_2_m3s": int((both & (implied > 2.0)).sum()),
+             "implied_max_m3s": float(implied[both].max()),
+             "head_blank": int(b.dostlik_Q.isna().sum()),
+             "other": int((b.dostlik_Q.notna() & b.kj_Q.isna()).sum())}]
+    # 2011: annual summary of the record book against the daily records, by month
+    summ = pd.read_csv(ROOT / "DATA/processed/annual_summary_2011_monthly.csv").set_index("month")
+    d11 = rec[rec.date.dt.year == 2011]
+    daily = d11.groupby(d11.date.dt.month)["kegeyli_Q"].sum() * 86400 / 1e6
+    diff = (daily.reindex(summ.index) - summ["kegeyli_mln_m3"]).abs()
+    may = d11[d11.date.dt.month == 5]
+    share = {c: float(summ.loc[5, f"{n}_mln_m3"] / (may[c].sum() * 86400 / 1e6))      # summary / May sheet, by canal
+             for c, n in (("dostlik_Q", "dostlik"), ("kegeyli_Q", "kegeyli"), ("kj_Q", "kuanyshjarma"))}
+    mfull = may.dropna(subset=["dostlik_Q", "kegeyli_Q", "kj_Q"])
+    rows[0].update({"y2011_daily_mln_m3": float(daily.sum()), "y2011_summary_mln_m3": float(summ["kegeyli_mln_m3"].sum()),
+                    "y2011_months_differing": ",".join(str(m) for m in diff.index[diff > 1e-6]),
+                    "y2011_may_summary_mln_m3": float(summ.loc[5, "kegeyli_mln_m3"]),
+                    "y2011_may_daily_mln_m3": float(daily.loc[5]),
+                    "y2011_may_summary_share_min": min(share.values()), "y2011_may_summary_share_max": max(share.values()),
+                    "y2011_may_balance_ratio_median": float(((mfull.kegeyli_Q + mfull.kj_Q + mfull.kok_ozek_Q.fillna(0.0))
+                                                             / mfull.dostlik_Q).median()),
+                    "y2011_may_days_balance": int(len(mfull)),
+                    "y2011_may_kegeyli_blank_days": int(may.kegeyli_Q.isna().sum())})
+    save(pd.DataFrame(rows), "record_checks", "Blank Kegeyli entries of the seasons classified by the balance of the "
+         "Dustlik head, and the 2011 annual volume against the daily records")
+    # complete-case outcome of the rules
+    blank = set(b.date.dt.normalize())
+    after = {d + pd.Timedelta(days=1) for d in blank} - blank
+    drop = blank | after
+    out = []
+    for case, methods in (("phys", ("LXB",)), ("q_main", ("LXB", "LXB-T000", "LXB-T050", "LXB-ES", "LXB-CO")),
+                          ("q_theta", ("LXB-T025", "LXB-T075")),
+                          ("iot_main", ("LXB", "LXB-T000", "LXB-T050", "LXB-ES", "LXB-CO"))):
+        for m in methods:
+            df = load(case, m)
+            if df.empty:
+                continue
+            keep = ~df["date"].isin(drop)
+            cc = df[keep]
+            seas = cc.groupby("year")[["V_R-1", "D_R-1"]].sum()
+            dk_all = dekad_errors(df, "V")
+            dk_cc = dekad_errors(df, "V", exclude=drop)
+            out.append({"case": case, "rule": m, "days": int(len(df)), "days_complete": int(len(cc)),
+                        "mean_daily_lambda": float(df["lambda"].mean()),
+                        "mean_daily_lambda_complete": float(cc["lambda"].mean()),
+                        "days_lambda_zero": int((df["lambda"] <= EPS).sum()),
+                        "days_lambda_zero_complete": int((cc["lambda"] <= EPS).sum()),
+                        "season_satisfaction_R1_mean_complete": float((seas["V_R-1"] / seas["D_R-1"]).mean()),
+                        "R1_dekad_err_mean": float(dk_all.mean()), "R1_dekad_err_mean_complete": float(dk_cc.mean()),
+                        "R1_dekads_complete": int(dk_cc.size)})
+    out = pd.DataFrame(out)
+    ref = out[(out.case == "phys") & (out.rule == "LXB")].iloc[0]
+    out["lambda_below_ideal"] = ref.mean_daily_lambda - out.mean_daily_lambda
+    out["lambda_below_ideal_complete"] = ref.mean_daily_lambda_complete - out.mean_daily_lambda_complete
+    out["change_of_difference"] = out.lambda_below_ideal_complete - out.lambda_below_ideal
+    out["lambda_rise"] = out.mean_daily_lambda_complete - out.mean_daily_lambda
+    out["dekad_err_change"] = out.R1_dekad_err_mean_complete - out.R1_dekad_err_mean
+    save(out, "complete_case", "Outcome of the rules with the blank days of the record treated as missing: "
+         "the blank days and the day after each run of blank days left out (complete-case), against all days")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--parts", default="quanta,t1,t2,node,t3,t4,rules,device")
+    ap.add_argument("--parts", default="quanta,t1,t2,node,t3,t4,rules,device,data")
     a = ap.parse_args()
     for part in a.parts.split(","):
         {"quanta": part_quanta, "t1": part_t1, "t2": part_t2, "node": part_node, "t3": part_t3, "t4": part_t4,
-         "rules": part_rules, "device": part_device}[part]()
+         "rules": part_rules, "device": part_device, "data": part_data}[part]()
 
 
 if __name__ == "__main__":

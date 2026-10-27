@@ -104,7 +104,7 @@ def fig_exclusion():
         return
     fig, axes = plt.subplots(len(cases), 1, figsize=(6.3, 1.55 * len(cases) + 0.4), sharex=True, squeeze=False)
     rng = np.random.default_rng(1)
-    for ax, case in zip(axes[:, 0], cases):
+    for panel, (ax, case) in enumerate(zip(axes[:, 0], cases)):
         qa = Quanta(CASE_K[case])
         rd = regulator_days(load(case, "LXB"), qa)
         rd = rd[rd["x"] > EPS]
@@ -128,8 +128,8 @@ def fig_exclusion():
         ax.invert_yaxis()
         ax.set_xscale("log")
         ax.grid(axis="y", visible=False)
-        ax.set_title(r"deadband $\delta$ = " + f"{qa.deadband * 100:.3g}% of the travel, " + rf"$k = {qa.k}$", loc="left",
-                     color=C["ink"])
+        ax.set_title(f"({'abc'[panel]}) " + r"deadband $\delta$ = " + f"{qa.deadband * 100:.3g}% of the travel, "
+                     + rf"$k = {qa.k}$", loc="left", color=C["ink"])
     axes[-1, 0].set_xlabel(r"daily plan in quanta, $x/q^{\min}$")
     h1 = plt.Line2D([], [], ls="", marker="o", ms=3, color=C["blue"], label="gate opened during the day")
     h2 = plt.Line2D([], [], ls="", marker="o", ms=3, color=C["orange"], label="gate never opened")

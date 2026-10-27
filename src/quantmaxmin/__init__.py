@@ -6,4 +6,4 @@ execution  -- an abstract quantised actuator and the execution rules of Theorems
               split, theta pulse rule, carry-over), used to check the theorems on random instances.
 The package depends only on NumPy and SciPy; the closed-loop simulation core is the package water01.
 """
-__version__ = "1.1.0"
+__version__ = "1.2.0"
