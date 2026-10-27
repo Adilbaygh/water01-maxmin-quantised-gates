@@ -2,12 +2,13 @@
 
 Actuator (simulation core, water01.iot.devices.quantize): the opening is n rho with an integer n; from the position
 n_prev a command n is executed when n = 0 (full closure) or |n - n_prev| >= k, otherwise the position is kept. A
-commanded opening is rounded to the nearest grid point. With relation (6) the volume of a step at opening n rho and
-level h is n g(h), so that the quantum is q(h) = k g(h) and the pulse volume is p(h) = (k + 1) g(h).
+commanded opening is rounded to the nearest grid point. With the gate relation (2) of the article the volume of a step
+at opening n rho and level h is n v(h), so that the quantum is q(h) = k v(h) and the pulse volume is p(h) = (k + 1) v(h)
+(Equation (4)).
 
-The level of every step is known exactly and constant within the step (assumption F2), a closed gate passes no water
-(F1) and the gate is closed at the start of the day (F3). A day is described by the sequence g_seq of the step volumes
-of one resolution step, g_seq[i] = g(h_i).
+The level of every step is known exactly and constant within the step (assumption A2), a closed gate passes no water
+(H1), the gate is closed at the start of the day (H3) and commands are not lost (H4). A day is described by the
+sequence g_seq of the volumes of one resolution step, g_seq[i] = v(h_i).
 """
 import math
 
@@ -28,24 +29,24 @@ class Actuator:
 
 
 def nearest(v, g):
-    """Grid steps nearest to the volume v (ties rounded up)."""
+    """Grid steps nearest to the volume v (ties rounded up; the theorems do not depend on how ties are broken)."""
     return int(math.floor(v / g + 0.5))
 
 
 def exclusion_threshold(q_min, k):
-    """Theorem 1(a): floor rounding leaves an outlet dry for 0 < x < (1 - 1 / (2 k)) q_min."""
+    """Theorem 1(a): direct execution leaves an outlet dry for 0 < x < (1 - 1 / (2 k)) q_min."""
     return (1.0 - 1.0 / (2.0 * k)) * q_min
 
 
-def floor_rule_day(x, g_seq, k, request=None, n_max=10 ** 9):
-    """Floor rounding: at every step the request u <= R (remaining plan) is rounded to the nearest grid point.
-    request(i, R) -> u (default u = R). Returns the delivered volume."""
+def direct_execution_day(x, g_seq, k, request=None, n_max=10 ** 9):
+    """Direct execution: at every step the request u <= [R]_+ (remaining plan) is rounded to the nearest grid point.
+    request(i, R) -> u (default u = [R]_+). Returns the delivered volume."""
     act = Actuator(k, n_max); V = 0.0
     for i, g in enumerate(g_seq):
-        R = x - V
+        R = max(x - V, 0.0)
         u = R if request is None else request(i, R)
         if u > R + 1e-12:
-            raise ValueError("floor rounding requests at most the remaining plan")
+            raise ValueError("direct execution requests at most the remaining plan")
         V += act.command(nearest(max(u, 0.0), g)) * g
     return V
 

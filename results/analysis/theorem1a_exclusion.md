@@ -1,4 +1,4 @@
-# Theorem 1(a): exclusion under floor rounding (LXB)
+# Theorem 1(a): exclusion under direct execution (LXB)
 
 | case | k | seasons | regulator_days_x_pos | predicted_exclusion | gate_never_opened | no_water | predicted_and_never_opened | never_opened_not_predicted | R1_never_opened | min_V_over_x_predicted | threshold | days_x_below_qmin | max_x_over_qmin_never_opened_not_predicted | min_x_over_qmin_opened | min_x_over_qmin_predicted | min_V_predicted_m3 | max_V_predicted_m3 | max_x_over_qmin_predicted |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

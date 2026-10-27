@@ -8,7 +8,13 @@ quantum q_j >= 0 (semi-continuous variable). The continuous max-min level and th
 
 and the price of indivisibility is Pi_ind = lambda* - lambda_q. For t > 0 every outlet needs at least
 max{t D_j, q_j}, so lambda_q = max{t in [0, 1] : G(t) <= V} with G(t) = sum_j max{t D_j, q_j} whenever V >= sum_j q_j,
-and lambda_q = 0 otherwise.
+and lambda_q = 0 otherwise. lambda_q is the minimum-delivery level: it keeps the smallest positive delivery q_j but not
+the grid of whole steps above it.
+
+Whole steps (Theorem 2(c)). At a constant level, a gate that starts the day closed delivers 0 or q_j + m v_j,
+m = 0, 1, ..., where v_j is the volume of one resolution step. The whole-step level lambda_v is lambda_q with the
+positive deliveries restricted to this grid; an outlet with v_j = 0 is not restricted (q_j = v_j = 0: no quantum).
+If the outlets without a quantum have the demand D_0 > 0, then lambda_q - sum_j v_j / D_0 <= lambda_v <= lambda_q.
 """
 import numpy as np
 
@@ -95,6 +101,57 @@ def quantised_level_milp(V, D, q):
     if not res.success:
         raise RuntimeError(res.message)
     return float(res.x[0])
+
+
+def _grid_need(t, D, q, v):
+    """Least delivery of every outlet for the level t > 0: max{t D_j, q_j}, raised to the grid q_j + m v_j where
+    v_j > 0."""
+    need = np.maximum(t * D, q)
+    grid = v > 0
+    if grid.any():
+        m = np.ceil((need[grid] - q[grid]) / v[grid] * (1 - 1e-15) - 1e-12)
+        need[grid] = q[grid] + v[grid] * np.maximum(m, 0.0)
+    return need
+
+
+def whole_step_level(V, D, q, v, tol=1e-13):
+    """lambda_v: the max-min level when the positive deliveries of outlet j lie on the grid q_j + m v_j (v_j > 0)
+    or in [q_j, inf) (v_j = 0). The required volume G_v(t) = sum_j need_j(t) is non-decreasing, so lambda_v is found by
+    bisection to tol; G_v is left-continuous, so the feasible levels form a closed interval [0, lambda_v]."""
+    D, q = _arrays(D, q)
+    v = np.asarray(v, float)
+    if v.shape != D.shape or np.any(v < 0):
+        raise ValueError("v must be a non-negative array of the length of D")
+    if V < q.sum():
+        return 0.0
+    G = lambda t: float(_grid_need(t, D, q, v).sum())          # noqa: E731
+    if G(1.0) <= V:
+        return 1.0
+    lo, hi = 0.0, 1.0
+    while hi - lo > tol:
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if G(mid) <= V else (lo, mid)
+    return lo
+
+
+def whole_step_level_enumerated(V, D, q, v):
+    """lambda_v by enumeration of the grid deliveries of the outlets with v_j > 0 (at most three), for checking
+    whole_step_level. The outlets with v_j = 0 must have no quantum (q_j = 0); they share the rest in proportion to
+    their demands. Deliveries above max{D_j, q_j} + v_j are not needed and are not enumerated."""
+    D, q = _arrays(D, q)
+    v = np.asarray(v, float)
+    grid = np.flatnonzero(v > 0); free = np.flatnonzero(v <= 0)
+    if grid.size > 3 or np.any(q[free] > 0):
+        raise ValueError("at most three grid outlets; the other outlets must have no quantum")
+    axes = [np.r_[0.0, q[j] + v[j] * np.arange(int(np.ceil(max(D[j] - q[j], 0.0) / v[j])) + 2)] for j in grid]
+    mesh = np.meshgrid(*axes, indexing="ij")
+    Vg = np.stack([m.ravel() for m in mesh], axis=1)            # [combinations x grid outlets]
+    t = np.minimum(1.0, (Vg / D[grid]).min(axis=1))
+    rest = V - Vg.sum(axis=1)
+    if free.size:
+        t = np.minimum(t, np.maximum(rest, 0.0) / D[free].sum())
+    t[rest < -1e-12] = 0.0
+    return float(t.max())
 
 
 def daily_prices(V, D, q):

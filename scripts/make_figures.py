@@ -1,13 +1,13 @@
 """Figures of the article from the stored runs and the analysis tables -> results/figures/*.png and *.pdf.
 
-  exclusion     daily plan of every regulator in quanta, x / q_min, under floor rounding (LXB), with the exclusion
+  exclusion     daily plan of every regulator in quanta, x / q_min, under direct execution (LXB), with the exclusion
                 threshold 1 - 1/(2k) of Theorem 1(a); one panel per deadband case
   theta         error of the theta pulse rule on pulse-regime days, (V - x~) / p_max, with the bounds of Theorem 3
-  equal_split   error of the equal split, |V - x~| / (g_max / 2), against the theta rule (theta = 0.5) on the same
+  equal_split   error of the equal split, |V - x~| / (v_max / 2), against the theta rule (theta = 0.5) on the same
                 regulator-days (Theorem 1(b))
   periods       accounting-period error |sum V - sum x| / sum D of the carry-over rule and of the theta rule
                 (theta = 0.5) against the length of the period T, with the bound of Theorem 4
-  april         daily worst-case satisfaction in the first decade of April (ideal execution, floor rounding, theta
+  april         daily worst-case satisfaction in the first decade of April (ideal execution, direct execution, theta
                 rule, carry-over)
 Usage: python scripts/make_figures.py [--figures exclusion,theta,equal_split,periods,april]
 """
@@ -63,7 +63,7 @@ def fig_schematic():
     """Figure 1: (a) volume delivered in one step from a closed gate against the requested volume; (b) daily delivery
     against the daily plan under the execution rules (abstract actuator, constant level, k = 5, N = 96)."""
     sys.path.insert(0, str(ROOT / "src"))
-    from quantmaxmin.execution import Actuator, equal_split_day, equal_split_m, floor_rule_day, nearest, theta_rule_day
+    from quantmaxmin.execution import Actuator, direct_execution_day, equal_split_day, equal_split_m, nearest, theta_rule_day
     k, N = 5, 96
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(6.3, 2.5))
     v = np.linspace(0, 12, 1201)
@@ -72,13 +72,13 @@ def fig_schematic():
     a1.step(v, out, where="post", color=C["blue"], lw=1.6)
     a1.axvline(k - 0.5, color=C["ink"], lw=0.6, ls=":")
     a1.annotate(r"$k-1/2$", (k - 0.5, 9.6), xytext=(k - 0.4, 9.6), fontsize=7, color=C["ink"])
-    a1.set_xlabel(r"requested volume of the step, in units of $g$"); a1.set_ylabel(r"delivered volume, in units of $g$")
+    a1.set_xlabel(r"requested volume of the step, in units of $v$"); a1.set_ylabel(r"delivered volume, in units of $v$")
     a1.set_title("(a) one step from a closed gate", loc="left", color=C["ink"])
     a1.set_xlim(0, 12); a1.set_ylim(0, 12)
     q, p = k * 1.0, (k + 1) * 1.0
     x = np.linspace(0.02, 4.0, 400) * q
     g = [1.0] * N
-    floor = [floor_rule_day(xx, g, k) for xx in x]
+    floor = [direct_execution_day(xx, g, k) for xx in x]
     th0 = [theta_rule_day(xx, g, k, 0.0)[0] for xx in x]
     th5 = [theta_rule_day(xx, g, k, 0.5)[0] for xx in x]
     es = []
@@ -89,7 +89,7 @@ def fig_schematic():
     a2.plot(x / q, np.array(th0) / q, color=C["yellow"], lw=1.4, ls="-", label=r"pulse rule, $\theta = 0$")
     a2.plot(x / q, np.array(th5) / q, color=C["blue"], lw=1.4, ls="-", label=r"pulse rule, $\theta = 0.5$")
     a2.plot(x / q, np.array(es) / q, color=C["aqua"], lw=1.6, ls="-", label="equal split")
-    a2.plot(x / q, np.array(floor) / q, color=C["orange"], lw=1.0, ls=(0, (3, 1.5)), label="floor rounding", zorder=5)
+    a2.plot(x / q, np.array(floor) / q, color=C["orange"], lw=1.0, ls=(0, (3, 1.5)), label="direct execution", zorder=5)
     a2.set_xlabel(r"daily plan $x/q$"); a2.set_ylabel(r"daily delivery $V/q$")
     a2.set_title(r"(b) one day, $N = 96$ steps", loc="left", color=C["ink"])
     a2.set_xlim(0, 4); a2.set_ylim(0, 4.8)
@@ -179,8 +179,8 @@ def fig_equal_split():
     a = regulator_days(es, qa); b = regulator_days(half, qa)
     a = a[a["mode"] == "ES"]
     m = a.merge(b[["date", "user", "V", "xt"]], on=["date", "user"], suffixes=("", "_t"))
-    e_es = (m["V"] - m["xt"]).abs() / (m["g_max"] / 2)
-    e_t = (m["V_t"] - m["xt_t"]).abs() / (m["g_max"] / 2)
+    e_es = (m["V"] - m["xt"]).abs() / (m["v_max"] / 2)
+    e_t = (m["V_t"] - m["xt_t"]).abs() / (m["v_max"] / 2)
     fig, ax = plt.subplots(figsize=(3.1, 2.1))
     bins = np.linspace(0, max(2.0, float(np.nanpercentile(e_t, 99))), 41)
     ax.hist(e_t.clip(upper=bins[-1]), bins=bins, color=C["orange"], alpha=0.85, label=r"pulse rule, $\theta = 0.5$",
@@ -188,7 +188,7 @@ def fig_equal_split():
     ax.hist(e_es.clip(upper=bins[-1]), bins=bins, color=C["blue"], alpha=0.85, label="equal split",
             edgecolor="white", linewidth=0.4)
     ax.axvline(1.0, color=C["ink"], lw=0.8, ls="--")
-    ax.set_xlabel(r"$|V-\tilde{x}|\,/\,(g^{\max}/2)$"); ax.set_ylabel("regulator-days")
+    ax.set_xlabel(r"$|V-\tilde{x}|\,/\,(v^{\max}/2)$"); ax.set_ylabel("regulator-days")
     ax.legend(loc="upper right")
     save(fig, "fig_equal_split")
 
@@ -220,7 +220,7 @@ def fig_periods():
 
 
 def fig_april():
-    runs = [("phys", "LXB", C["ink2"], "ideal execution"), ("q_main", "LXB", C["orange"], "floor rounding (LXB)"),
+    runs = [("phys", "LXB", C["ink2"], "ideal execution"), ("q_main", "LXB", C["orange"], "direct execution (LXB)"),
             ("q_main", "LXB-T050", C["blue"], r"pulse rule, $\theta = 0.5$"), ("q_main", "LXB-CO", C["aqua"], "carry-over")]
     have = [(c, m, col, lab) for c, m, col, lab in runs if not load(c, m, (2010,)).empty]
     if len(have) < 2:
@@ -244,7 +244,7 @@ def fig_carryover():
     if not f.exists():
         return
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(6.3, 2.5))
-    runs = [("phys", "LXB", C["muted"], "ideal execution", "--"), ("q_main", "LXB", C["orange"], "floor rounding", "-"),
+    runs = [("phys", "LXB", C["muted"], "ideal execution", "--"), ("q_main", "LXB", C["orange"], "direct execution", "-"),
             ("q_main", "LXB-T050", C["blue"], r"pulse rule, $\theta = 0.5$", "-"), ("q_main", "LXB-CO", C["aqua"], "carry-over", "-")]
     for c, m, col, lab, ls in runs:
         df = load(c, m, (2010,))

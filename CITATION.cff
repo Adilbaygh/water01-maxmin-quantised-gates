@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software or its results, please cite the article and this project."
 title: "water-01: max–min water delivery through quantised gates at a canal node (code, configuration and results)"
 type: software
-version: "2.0.0"
+version: "2.1.0"
 date-released: "2026-10-27"
 license: MIT
 authors:

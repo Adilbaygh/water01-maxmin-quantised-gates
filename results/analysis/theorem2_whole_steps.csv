@@ -1,0 +1,2 @@
+supply_days,deficit_days_with_supply,levels,level_step_m,max_gap_range,no_deficit_days_lambda_v_below_1_range,max_gap_hi,max_gap_lo,mean_gap_hi,days_gap_pos_hi,no_deficit_days_lambda_v_below_1,max_bound_steps_deficit,max_bound_steps_supply,bracket_holds_days,bracket_holds_days_range,max_Pi_lo,sum_v_hi_m3,sum_v_lo_m3
+1741,560,84,0.01,0.0002438386927428038,0,0.00019330731224609377,0.00014543355449930795,1.129978091166315e-05,560,0,0.0003307921958458377,0.006529826515676112,1741,1741,1.1102230246251565e-16,165.7620571483717,123.20948252033983

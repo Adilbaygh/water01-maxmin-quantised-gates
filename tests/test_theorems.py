@@ -1,5 +1,5 @@
 """Randomised checks of Theorems 1-4 on the abstract quantised actuator (quantmaxmin.execution) and of the exact
-quantised level (quantmaxmin.allocation) against a mixed-integer programme."""
+minimum-delivery and whole-step levels (quantmaxmin.allocation) against a mixed-integer programme and an enumeration."""
 import math
 import sys
 from pathlib import Path
@@ -10,9 +10,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from quantmaxmin.allocation import (continuous_level, epsilon_star, price_of_indivisibility,  # noqa: E402
-                                    quantised_level, quantised_level_milp, required_volume)
-from quantmaxmin.execution import (carry_over, equal_split_day, equal_split_m, exclusion_threshold,  # noqa: E402
-                                   floor_rule_day, theta_rule_day)
+                                    quantised_level, quantised_level_milp, required_volume, whole_step_level,
+                                    whole_step_level_enumerated)
+from quantmaxmin.execution import (carry_over, direct_execution_day, equal_split_day, equal_split_m,  # noqa: E402
+                                   exclusion_threshold, theta_rule_day)
 
 N = 96
 TOL = 1e-9
@@ -47,7 +48,7 @@ def test_theorem2_formula_bounds_and_conditions():
         lam = continuous_level(V, D); lq = quantised_level(V, D, q); pi = lam - lq
         assert -TOL <= pi <= lam + TOL
         if V < q.sum():
-            assert lq == 0.0                                            # Theorem 2(c): someone gets no water
+            assert lq == 0.0                                            # Theorem 2(d): someone gets no water
             continue
         if lam < 1.0:                                                   # deficit day, Theorem 2(a)
             assert pi == pytest.approx(epsilon_star(V, D, q), abs=1e-8)
@@ -67,23 +68,71 @@ def test_theorem2_bound_is_attained_asymptotically():
     assert price_of_indivisibility(V, D, q) == pytest.approx(q.sum() / D.sum(), rel=1e-4)
 
 
+def whole_step_instance(rng, n_grid):
+    """n_grid outlets with a quantum and a step grid, and one or two outlets without a quantum (q = v = 0)."""
+    n_free = int(rng.integers(1, 3))
+    v = np.r_[rng.uniform(0.5, 4.0, n_grid), np.zeros(n_free)]
+    k = rng.integers(2, 11, n_grid)
+    q = np.r_[k * v[:n_grid], np.zeros(n_free)]
+    D = np.r_[rng.uniform(0.2, 3.0, n_grid) * q[:n_grid], rng.uniform(5.0, 200.0, n_free)]
+    V = rng.uniform(0.3, 1.3) * D.sum()
+    return V, D, q, v
+
+
+def test_whole_step_level_matches_enumeration():
+    rng = np.random.default_rng(11)
+    for _ in range(300):
+        V, D, q, v = whole_step_instance(rng, int(rng.integers(1, 4)))
+        assert whole_step_level(V, D, q, v) == pytest.approx(whole_step_level_enumerated(V, D, q, v), abs=1e-9)
+
+
+def test_theorem2c_whole_step_bracket():
+    # counterexample of a minimum-delivery level that whole steps cannot reach: D = (6, 6), W = 11, q = (5, 0), v = (1, 0)
+    assert quantised_level(11.0, [6.0, 6.0], [5.0, 0.0]) == pytest.approx(11 / 12)
+    assert whole_step_level(11.0, [6.0, 6.0], [5.0, 0.0], [1.0, 0.0]) == pytest.approx(5 / 6, abs=1e-9)
+    rng = np.random.default_rng(12)
+    for _ in range(3000):
+        V, D, q, v = whole_step_instance(rng, int(rng.integers(1, 7)))
+        lq = quantised_level(V, D, q); lv = whole_step_level(V, D, q, v)
+        D0 = D[v == 0].sum()
+        assert lv <= lq + 1e-9
+        assert lv >= lq - v.sum() / D0 - 1e-9
+
+
+def test_corollary1_node_level_with_a_free_outlet():
+    # theta = 0 at every quantised outlet: each receives at least its plan and less than one pulse more, so the outlet
+    # without a quantum, which receives the rest, loses less than the sum of the pulses
+    rng = np.random.default_rng(13)
+    for _ in range(500):
+        n = int(rng.integers(1, 6)); k = int(rng.integers(2, 11))
+        g_days = [day(rng, k) for _ in range(n)]
+        p_max = np.array([(k + 1) * g.max() for g in g_days])
+        x = np.array([rng.uniform(1e-3, 0.9) * N * (k + 1) * g.min() for g in g_days])
+        D0 = rng.uniform(10.0, 1e4); lam = rng.uniform(0.05, 1.0); x0 = lam * D0
+        W = x.sum() + x0
+        V = np.array([theta_rule_day(x[j], g_days[j], k, 0.0)[0] for j in range(n)])
+        V0 = W - V.sum()
+        assert np.all(V >= x - 1e-9)
+        assert V0 / D0 > lam - p_max.sum() / D0 - 1e-12
+
+
 # Theorem 1 -----------------------------------------------------------------------------------------------------------
-def test_theorem1a_exclusion_under_floor_rounding():
+def test_theorem1a_exclusion_under_direct_execution():
     rng = np.random.default_rng(3)
     for _ in range(3000):
         k = int(rng.integers(2, 11)); g = day(rng, k)
         q_min = k * g.min()
         x = rng.uniform(1e-6, 1.0) * exclusion_threshold(q_min, k) * (1 - 1e-12)
         frac = rng.uniform(0.2, 1.0)
-        V = floor_rule_day(x, g, k, request=lambda i, R: R * frac if rng.random() < 0.5 else R)
+        V = direct_execution_day(x, g, k, request=lambda i, R: R * frac if rng.random() < 0.5 else R)
         assert V == 0.0
 
 
 def test_theorem1a_threshold_is_sharp_at_constant_level():
     for k in range(2, 11):
         g = np.ones(N)
-        assert floor_rule_day(exclusion_threshold(k, k) * (1 - 1e-9), g, k) == 0.0
-        assert floor_rule_day(exclusion_threshold(k, k) * (1 + 1e-9), g, k) > 0.0
+        assert direct_execution_day(exclusion_threshold(k, k) * (1 - 1e-9), g, k) == 0.0
+        assert direct_execution_day(exclusion_threshold(k, k) * (1 + 1e-9), g, k) > 0.0
 
 
 def test_theorem1b_equal_split():
