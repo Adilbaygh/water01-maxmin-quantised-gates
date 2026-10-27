@@ -11,9 +11,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from quantmaxmin.allocation import (continuous_level, epsilon_star, price_of_indivisibility,  # noqa: E402
                                     quantised_level, quantised_level_milp, required_volume, whole_step_level,
-                                    whole_step_level_enumerated)
-from quantmaxmin.execution import (carry_over, direct_execution_day, equal_split_day, equal_split_m,  # noqa: E402
-                                   exclusion_threshold, theta_rule_day)
+                                    whole_step_level_enumerated, whole_step_lower_bound)
+from quantmaxmin.execution import (Actuator, carry_over, direct_execution_day, equal_split_day,  # noqa: E402
+                                   equal_split_m, exclusion_threshold, theta_rule_day)
 
 N = 96
 TOL = 1e-9
@@ -97,6 +97,60 @@ def test_theorem2c_whole_step_bracket():
         D0 = D[v == 0].sum()
         assert lv <= lq + 1e-9
         assert lv >= lq - v.sum() / D0 - 1e-9
+
+
+def test_theorem2c_all_outlets_quantised():
+    # the bound of part (c) needs no outlet without a quantum; in the counterexample it is attained: tau = 5/6
+    assert whole_step_lower_bound(11.0, [6.0, 6.0], [5.0, 0.0], [1.0, 0.0]) == pytest.approx(5 / 6)
+    rng = np.random.default_rng(14)
+    n_pos = 0
+    for i in range(3000):
+        n = int(rng.integers(1, 5))
+        v = rng.uniform(0.5, 4.0, n); k = rng.integers(2, 11, n); q = k * v
+        D = rng.uniform(0.5, 6.0, n) * q
+        V = rng.uniform(0.3, 1.3) * D.sum()
+        lq = quantised_level(V, D, q); lv = whole_step_level(V, D, q, v); tau = whole_step_lower_bound(V, D, q, v)
+        assert tau - 1e-9 <= lv <= lq + 1e-9
+        if n <= 3 and i < 600:
+            assert lv == pytest.approx(whole_step_level_enumerated(V, D, q, v), abs=1e-9)
+        n_pos += tau > 0
+    assert n_pos > 1000
+
+
+def test_theorem2c_condition_for_a_gate_with_a_nonlinear_discharge():
+    """Appendix A: at a constant level, a gate whose one-step volume P(n) increases with the opening, with quantum
+    q = P(k), largest one-step increment v and full-opening volume C >= 2q, delivers a volume in [y, y + v] for every
+    q <= y <= (N - 3) C, from the closed or an open position: m fully open steps, a closure and up to two openings
+    from the closed position, all executed by the actuator (3)."""
+    rng = np.random.default_rng(15)
+    checked = 0
+    for _ in range(2000):
+        k = int(rng.integers(2, 11)); n_max = int(rng.integers(50, 1001))
+        a, b = rng.uniform(0.5, 5.0), rng.uniform(0.0, 0.02)
+        P = lambda n: a * n / (1.0 + b * n)                                       # noqa: E731
+        q, C = P(k), P(n_max)
+        v = max(P(n + 1) - P(n) for n in range(k, n_max))
+        if C < 2 * q:
+            continue
+        y = rng.uniform(q, (N - 3) * C)
+        start = 0 if rng.random() < 0.5 else int(rng.integers(1, n_max + 1))
+        m = max(0, math.ceil((y - 2 * C) / C)); r = y - m * C
+        grid = np.array([P(n) for n in range(k, n_max + 1)])
+        up = lambda z: k + int(np.searchsorted(grid, z - 1e-12))                  # noqa: E731  smallest n, P(n) >= z
+        trims = [up(r)] if r <= C else ([n_max, up(r - C)] if r - C >= q else [up(r - q), k])
+        plan = [0] + [n_max] * m + [0]                                           # close, full steps, close
+        for i, n in enumerate(trims):
+            plan += [0, n] if i else [n]                                         # openings from the closed position
+        assert len(plan) <= N
+        plan += [0] * (N - len(plan))                                            # closed for the rest of the day
+        act = Actuator(k, n_max, position=start); total = 0.0
+        for n in plan:
+            pos = act.command(n)
+            assert pos == n                                                      # every command is executed
+            total += P(pos) if pos > 0 else 0.0
+        assert y - 1e-9 <= total <= y + v + 1e-9
+        checked += 1
+    assert checked > 1500
 
 
 def test_corollary1_node_level_with_a_free_outlet():

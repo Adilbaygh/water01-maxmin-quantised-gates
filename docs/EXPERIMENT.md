@@ -11,7 +11,8 @@ rule over the vegetation seasons 2010–2019.
 - **Plant** (`src/water01/hydraulics`): the Kegeyli pool upstream of the Dustlik node, Saint–Venant equations solved by
   the four-point Preissmann scheme; recorded head discharge S(t) of the Kegeyli canal times the delivery factor
   η = 0.81 as inflow; six outlets at the node: five gated regulators (Abad-Yarmish, R-1, Khalkabad-2, Kanly-Yab, K-2)
-  and the check structure towards the lower Kegeyli canal (no quantum).
+  and the check structure (barrier) towards the lower Kegeyli canal, which holds the level and is not operated by
+  the rules; all six gates are positioned by the actuator.
 - **Plan** (`src/water01/control/lxb.py`, `src/water01/optimization/lexlp.py`): every day the three-stage
   lexicographic programme LXB fixes the daily volumes x_j of the six outlets over a receding window of 10 days (first
   stage: the max–min level of satisfaction λ\*, with a second max–min level for the current day; second stage: the
@@ -59,14 +60,15 @@ pulses and of equal-split open steps, the number m_j of the equal split and the 
 
 | Part | Check | Quantities |
 |---|---|---|
-| t1 | Theorem 1(a): under LXB a regulator-day with 0 < x_j < (1 − 1/(2k)) q_j^min is excluded | predicted exclusions against regulator-days with the gate never open and against days without water, for the deadband, gate-coefficient and leakage cases (q_j^min at the minimum level of the day) |
+| t1 | Theorem 1(a): under LXB a regulator-day with 0 < x_j < (1 − 1/(2k)) q_j^min is excluded | predicted exclusions against regulator-days with the gate never open and against days without water, for the deadband, gate-coefficient and leakage cases (q_j^min at the minimum level of the day); the assumption 0 ≤ u_i ≤ R_i⁺ of every request is checked by `scripts/check_residual_cap.py` (re-runs of the seven direct-execution cases) |
 | t1 | Theorem 1(b): under LXB-ES, \|V_j − x_j\| ≤ v_j^max/2 | share of equal-split regulator-days within the bound, with V̂ and with V |
-| t2 | Theorem 2: 0 ≤ Π_ind ≤ Σq_j/ΣD_j, Π_ind = 0 ⇔ λ\* D_j ≥ q_j for every regulator; λ_q − Σv_j/D_6 ≤ λ_v ≤ λ_q; V < Σq_j^min forces a dry outlet | daily λ\*, minimum-delivery level λ_q and Π_ind = λ\* − λ_q of the node from the operating records (exact breakpoint algorithm of `quantmaxmin.allocation.quantised_level`, checked against a mixed-integer programme in `tests/`), and the whole-step level λ_v at the lower and upper operating level (`whole_step_level`, checked by enumeration) |
+| t2 | Theorem 2: 0 ≤ Π_ind ≤ Σq_j/ΣD_j, Π_ind = 0 ⇔ λ\* D_j ≥ q_j for every outlet; τ ≤ λ_v ≤ λ_q with the lower bound τ of part (c); V < Σq_j^min forces a dry outlet | daily λ\*, minimum-delivery level λ_q and Π_ind = λ\* − λ_q of the node from the operating records (exact breakpoint algorithm of `quantmaxmin.allocation.quantised_level`, checked against a mixed-integer programme in `tests/`), with the quantum of the barrier from the closed position; at the levels of the operating range in steps of 1 cm, the lower bound τ of part (c) (`whole_step_lower_bound`), which holds for every gate that delivers a volume in each interval of one step above its quantum (the barrier at a constant level with its quantum and largest one-step volume, if one fully open step passes at least twice the quantum and N − 3 such steps cover its demand; both are checked), and λ_v with all six gates on grids (`whole_step_level`, checked by enumeration); on the days without deficit, the margin of the supply over max{D_j, q_j} plus one step of every gate |
 | node | balance of the six outlets | surplus of the regulators over their plans, satisfaction of the barrier against its plan on the deficit days, storage change of the pool, seasonal delivery over the plan of every outlet |
 | t3 | Theorem 3: in the pulse regime the θ rule gives x̃_j − θ min{p_j^max, x̃_j} ≤ V_j < x̃_j + p_j^max | bounds on the regulator-days with pulses only, with V̂ and with V |
 | t4 | Theorem 4: −p_j^max < e_j(s) ≤ θ p_j^max for the carry-over debt; period error \|ΣV_j − Σx_j\|/ΣD_j for T = 1, 10, 30 days and the season | debt recursion reconstructed from x_j and V̂_j; period errors of LXB-CO against LXB-T050 |
 | rules | outcome of every rule | mean and minimum daily λ, days with λ = 0, regulator-days with r_j = 0, shortfall and over-delivery of the regulators, seasonal satisfaction of R-1, error of R-1 over the calendar dekads (mean, median, 95th percentile, largest) with V and with V̂, days of R-1 by execution mode, gate movements (from `scripts/gate_activity.py`) |
 | device | device chain against the quantised actuator alone | pulse days on which the executed open steps differ from the commanded pulses by one or two (a lost command packet), the error of V̂ against V, equal-split days outside half a resolution step |
+| data | operating records | blank Kegeyli entries classified by the balance of the Dustlik head; the 2011 annual volume against the daily records, month by month; outcome of the rules with the blank days and the day after each run of them left out |
 
 Tolerances: 10⁻⁶ m³ for volumes, 10⁻¹² for levels of satisfaction.
 
