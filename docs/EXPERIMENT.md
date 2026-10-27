@@ -35,7 +35,7 @@ regulators.
 
 | Rule | Execution of the regulators | Theorem |
 |---|---|---|
-| LXB | direct execution: commands of the execution programme as they are (the programme never requests more than the remaining plan); a command inside the deadband of a closed gate is not executed | 1(a) |
+| LXB | direct execution: commands of the execution programme as they are (the programme keeps the requested volume within the remaining plan by a penalty, not by a constraint; `scripts/check_residual_cap.py` lists the steps at which it does not); a command inside the deadband of a closed gate is not executed | 1(a) |
 | LXB-T000, LXB-T025, LXB-T050, LXB-T075 | θ pulse rule, θ = 0, 0.25, 0.5, 0.75: a command inside the deadband becomes one pulse when the remaining plan R_j is positive and R_j ≥ θ min{p_j, x_j}, and a closure otherwise; LXB-T050 coincides with the deadband-aware rule LXB-DA of the simulation core | 3 |
 | LXB-ES | equal split with pulse fallback: a plan between one quantum at the upper operating level and the pulse-regime limit is delivered in m_j open steps separated by closed steps, m_j = min(⌈N/2⌉, max(1, ⌊x_j/(q_j^hi + v_j^hi)⌋)); the other plans are executed as under the θ rule with θ = 0.5 | 1(b) |
 | LXB-CO | carry-over: the θ rule (θ = 0.5) applied to the plan plus the estimated debt of the previous day, x̃_j(s) = x_j(s) + e_j(s−1), e_j(s) = x̃_j(s) − V̂_j(s); the regulator is closed for the day when x̃_j(s) ≤ 0 | 4 |
