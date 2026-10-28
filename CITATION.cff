@@ -2,8 +2,14 @@ cff-version: 1.2.0
 message: "If you use this software or its results, please cite the article and this project."
 title: "water-01: max–min water delivery through quantised gates at a canal node (code, configuration and results)"
 type: software
-version: "2.2.2"
+version: "2.3.0"
 date-released: "2026-10-28"
+doi: "10.5281/zenodo.23728409"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23728409"
+    description: "Archived version 2.3.0 (Zenodo)"
+repository-code: "https://github.com/Adilbaygh/water01-maxmin-quantised-gates"
 license: MIT
 authors:
   - family-names: Kudaybergenov

@@ -9,6 +9,9 @@
 !/LICENSE
 !/LICENSE-DATA.md
 !/requirements.txt
+# graphical interface
+!/main.py
+!/gui/
 !/src/
 !/configs/
 !/docs/
