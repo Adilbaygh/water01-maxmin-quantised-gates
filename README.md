@@ -1,5 +1,7 @@
 # water-01: max–min water delivery through quantised gates at a canal node
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23728409.svg)](https://doi.org/10.5281/zenodo.23728409)
+
 Computation project of the article on max–min (worst-user) water delivery through gates with a finite resolution and
 an actuator deadband, with the Dustlik node of the Kegeyli irrigation canal (Republic of Karakalpakstan, Uzbekistan)
 as the case. The project contains the theory module of the article, the closed-loop Saint–Venant simulation core,
@@ -19,6 +21,7 @@ the execution rules, the simulation cases, the analysis scripts and the results.
 | `scripts/make_figures.py` | Figures → `results/figures/` |
 | `scripts/verification_convergence.py`, `scripts/verification_pulse.py`, `scripts/check_swmm_benchmark.py` | Verification of the plant: grid and time-step convergence, volume of a single pulse, comparison with EPA SWMM 5 → `results/verification/` |
 | `scripts/derive_inputs.py` | Delivery factor, monthly shares of the Abad-Yarmish regulator, node balance and checks of the records → `results/inputs/derived_inputs.json`; with `--write-demand`, the demand file (reproduced bit for bit) |
+| `main.py`, `gui/` | Graphical interface (English and Uzbek): stored results and environment, configuration and records, gate and execution rules, runs of missing seasons, plots of the daily results, analysis scripts and tables, figures |
 | `docs/EXPERIMENT.md` | Design of the computational experiment: plant, plan, actuator, rules, cases, recorded quantities and checks |
 | `docs/EXPECTED_OUTCOMES_uz.md` | Expected outcomes of the rules, the device chain and the robustness cases, recorded (in Uzbek) before these results were examined |
 | `tests/` | Randomised checks of Theorems 1–4 on the abstract actuator (about 29 000 instances, with a mixed-integer check of λ_q, an enumeration check of λ_v and a constructive check of the condition of Theorem 2(c) for a gate with a nonlinear discharge), short closed-loop checks of the rules, and the tests of the simulation core (`test_core_*.py`) |
@@ -27,7 +30,7 @@ the execution rules, the simulation cases, the analysis scripts and the results.
 | `DATA/raw/nasa_power/` | Hourly irradiance (NASA POWER) for the solar energy balance of the full IoT chain |
 | `results/runs/` | One table per (case, rule, season): daily plan, executed target, delivered and estimated volumes, openings and pulses of every outlet, with a `.meta.json` file (environment, code and input checksums, configuration) |
 | `results/analysis/` | Summary tables of the theorem checks (CSV and Markdown) |
-| `results/figures/` | Figures of the article (PNG and PDF) |
+| `results/figures/` | Figures 1–5 of the article (PNG and PDF); `fig_april` and `fig_periods` are the two panels of Figure 5 as separate figures |
 | `results/inputs/` | Derived inputs of the case (`derived_inputs.json`) |
 | `results/verification/` | Verification of the plant (convergence, single pulse, EPA SWMM benchmark) |
 
@@ -74,6 +77,28 @@ the input files and the active configuration. The stored runs were computed with
 `scripts/gate_activity.py` and `scripts/check_residual_cap.py` re-run stored cases with this release and stop if a
 stored daily volume is not reproduced within 10⁻⁶ m³. The numbers of the tables of the article are those of
 `results/analysis/*.md`; the manuscript itself is not part of the repository.
+
+## Graphical interface
+
+    python main.py                # start the interface
+    python main.py --lang uz      # the interface in Uzbek (the choice is remembered)
+    python main.py --check        # environment, checksums of the core and state of the stored seasons, in the terminal
+
+The interface needs Tkinter, which the Python installers for Windows and macOS include (on Linux: the package
+`python3-tk`). It reads the stored results and runs the scripts of the project in separate processes, on request only;
+it does not change the simulation core or a complete stored season. Its tabs show the outcome of the rules (Table 4 of
+the article) and the environment; the parameters of the configuration with their status and source, and the supply,
+demand and λ\* of every season; the step volumes of a regulator and the execution rules on one day and over several
+days at a constant level, with the bounds of Theorems 1, 3 and 4; the state of the 200 seasons, whose missing seasons
+are computed with the functions of `scripts/run_cases.py` (in parallel if requested); the daily results by case, rule,
+season and outlet, with export to CSV; the analysis scripts and the tables of `results/`; and the figures of
+`results/figures` (Figures 1–5 of the article and two separate panels of Figure 5). Settings are kept in
+`~/.water01_gui.json`.
+
+## Citation
+
+Version 2.3.0 of this repository is archived at Zenodo: https://doi.org/10.5281/zenodo.23728409. The authors and the
+article to cite are given in `CITATION.cff`.
 
 ## Licence
 
