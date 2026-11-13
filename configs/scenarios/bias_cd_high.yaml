@@ -1,0 +1,5 @@
+meta:
+  name: bias_cd_high
+  description: "Sensitivity (plant/controller mismatch): discharge coefficient of the five regulators in the plant 20% higher than in the controller's model (0.744 against 0.62); relation (6) is linear in the coefficient, so the plant discharges are 1.2 of those of the model"
+additions:
+  outlet_rating_factors: {value: [1.2, 1.2, 1.2, 1.2, 1.2], status: assumed, source: "actual / modelled regulator discharge = 0.744 / 0.62 (bias of the uncalibrated coefficient)"}

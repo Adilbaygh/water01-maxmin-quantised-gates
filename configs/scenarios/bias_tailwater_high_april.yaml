@@ -1,0 +1,7 @@
+meta:
+  name: bias_tailwater_high_april
+  description: "Sensitivity (plant/controller mismatch, direct execution in April): tail-water levels of the five regulators in the plant 0.3 m higher than in the controller's model (scripts/run_sensitivity.py builds the plant node with the shifted levels); window 1 April - 10 May"
+overrides:
+  season_days: {value: 40, status: setting, source: "1 April - 10 May (window of the April exclusions)"}
+additions:
+  plant_tailwater_offset_m: {value: 0.3, status: assumed, source: "bias of the assumed tail-water levels (not in the passport)"}

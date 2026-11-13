@@ -267,3 +267,114 @@ def test_daily_satisfaction_below_one_quantum_is_zero_or_one():
         V, _ = theta_rule_day(x, g, k, float(rng.random())) if x > 0 else (0.0, 0)
         r = min(1.0, V / Dj)
         assert r in (0.0, 1.0)
+
+
+# Remarks A5 and A6 -------------------------------------------------------------------------------------------------------
+def theta_rule_day_general(x, g_seq, k, thetas, n0=0):
+    """Theta pulse rule from the opening n0 (Remark A5) with a threshold that may vary from step to step (Remark A6).
+    Returns (delivered volume, number of pulse decisions)."""
+    act = Actuator(k, position=n0); V = 0.0; pulses = 0
+    for i, g in enumerate(g_seq):
+        p = (k + 1) * g; R = x - V; th = thetas[i]
+        if R > 0 and R >= th * min(p, x):
+            V += act.command(k + 1) * g; pulses += 1
+        else:
+            act.command(0)
+    return V, pulses
+
+
+def test_remark_a5_gate_open_at_the_start_of_the_day():
+    rng = np.random.default_rng(8)
+    checked_lower = 0
+    for _ in range(4000):
+        k = int(rng.integers(2, 11)); g = day(rng, k)
+        n0 = int(rng.integers(1, 3 * k + 2))
+        theta = float(rng.choice([0.0, 0.25, 0.5, 0.75, 1.0, rng.random()]))
+        p_max = (k + 1) * g.max()
+        x = rng.uniform(1e-3, 0.999) * N * (k + 1) * g.min()
+        V, _ = theta_rule_day_general(x, g, k, [theta] * N, n0)
+        assert V < x + max(p_max, n0 * g.max()) + 1e-9
+        if n0 <= 2 * k:
+            assert V < x + 2 * k / (k + 1) * p_max + 1e-9
+        if x < N * min(n0, k + 1) * g.min():
+            assert V >= x - theta * min(p_max, x) - 1e-9
+            checked_lower += 1
+    assert checked_lower > 1000
+
+
+def test_remark_a6_varying_threshold():
+    rng = np.random.default_rng(9)
+    for _ in range(4000):
+        k = int(rng.integers(2, 11)); g = day(rng, k)
+        thetas = rng.random(N) * float(rng.choice([0.25, 0.5, 1.0]))
+        p_min, p_max = (k + 1) * g.min(), (k + 1) * g.max()
+        x = rng.uniform(1e-3, 0.999) * N * p_min
+        V, pulses = theta_rule_day_general(x, g, k, thetas)
+        assert pulses >= 1
+        assert V >= x - thetas.max() * min(p_max, x) - 1e-9
+        assert V < x + p_max
+        if x >= p_max:
+            assert V <= x + (1 - thetas.min()) * p_max + 1e-9
+
+
+def test_equal_split_with_the_fewest_open_steps_of_the_variant_rule():
+    # the variant of scripts/rules_variants.py: m = min(ceil(N/2), max(1, ceil(x / (C - g_max)))), open steps floor(i N / m)
+    rng = np.random.default_rng(10)
+    n_cases = 0
+    for _ in range(3000):
+        k = int(rng.integers(2, 11)); g = day(rng, k)
+        q_max, g_max = k * g.max(), g.max()
+        n_max = int(rng.integers(math.ceil((2 * q_max + 3 * g_max) / g.min()), 60 * k))
+        c_step = n_max * g.min()
+        x = rng.uniform(q_max, 0.9 * N * (k + 1) * g.min())
+        if x > math.ceil(N / 2) * (c_step - g_max):
+            continue
+        m = int(min(math.ceil(N / 2), max(1, math.ceil(x / (c_step - g_max)))))
+        if m > 1 and min(b - a for a, b in zip([math.floor(i * N / m) for i in range(m)],
+                                                [math.floor(i * N / m) for i in range(1, m)])) < 2:
+            continue
+        V, ok = equal_split_day(x, g, k, n_max, m, spread=True)
+        assert ok and abs(V - x) <= g_max / 2 + 1e-9
+        n_cases += 1
+    assert n_cases > 2000
+
+
+def test_equal_split_with_a_trimming_step():
+    # Remark A1 with unequal increments: n equal increments (x - y) / n of at most u, then y = q_max + g_max; open steps
+    # floor((i + 1/2) N / m), each separated by closed steps
+    rng = np.random.default_rng(11)
+    n_cases = 0
+    for _ in range(3000):
+        k = int(rng.integers(2, 11)); g = day(rng, k)
+        q_max, g_max = k * g.max(), g.max()
+        n_max = int(rng.integers(math.ceil((2 * q_max + 3 * g_max) / g.min()), 60 * k))
+        c_step = n_max * g.min()
+        y = q_max + g_max
+        u = max(min(c_step - g_max, rng.uniform(y, c_step)), y)
+        x = rng.uniform(q_max, 0.9 * N * (k + 1) * g.min())
+        if x > math.ceil(N / 2) * (c_step - g_max):
+            continue
+        if x < 2 * y:
+            inc = [x]
+        else:
+            n = max(1, min(math.ceil((x - y) / u), math.floor((x - y) / y), math.ceil(N / 2) - 1))
+            if (x - y) / n > c_step - g_max or (x - y) / n < y:
+                continue
+            inc = [(x - y) / n] * n + [y]
+        m = len(inc)
+        steps = [int(math.floor((i + 0.5) * N / m)) for i in range(m)]
+        if m > 1 and min(b - a for a, b in zip(steps, steps[1:])) < 2:
+            continue
+        targets = dict(zip(steps, np.cumsum(inc)))
+        act = Actuator(k, n_max); V = 0.0; ok = True
+        for s, gs in enumerate(g):
+            if s in targets:
+                n_cmd = int(math.floor((targets[s] - V) / gs + 0.5))
+                n_ex = act.command(n_cmd)
+                ok &= (n_ex == n_cmd) and n_cmd >= k
+                V += n_ex * gs
+            else:
+                act.command(0)
+        assert ok and abs(V - x) <= g_max / 2 + 1e-9
+        n_cases += 1
+    assert n_cases > 2000

@@ -30,6 +30,9 @@
 !/scripts/check_swmm_benchmark.py
 !/scripts/gate_activity.py
 !/scripts/check_residual_cap.py
+!/scripts/rules_variants.py
+!/scripts/run_sensitivity.py
+!/scripts/analyse_sensitivity.py
 # input data: the processed operating records and the NASA POWER files are public; the original record sheets stay
 # local
 !/DATA/
@@ -40,7 +43,7 @@
 !/DATA/processed/rashod_2010_2019_daily.csv
 !/DATA/processed/demand_decadal.csv
 !/DATA/processed/dispatcher_2020_kegeyli.csv
-!/DATA/processed/plan_2021_kegeyli_decadal.csv
+!/DATA/processed/plan_2020_kegeyli_decadal.csv
 !/DATA/processed/annual_volumes_2010_2019.csv
 !/DATA/processed/annual_summary_2011_monthly.csv
 !/DATA/raw/

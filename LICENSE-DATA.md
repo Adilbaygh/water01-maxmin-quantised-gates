@@ -11,5 +11,5 @@ Third-party data:
 - `DATA/raw/nasa_power/`: hourly irradiance from the NASA Langley Research Center POWER Project
   (https://power.larc.nasa.gov/), which is freely available; please acknowledge the POWER Project when you reuse it.
 - `DATA/processed/`: processed operating records of the Kegeyli irrigation system (Republic of Karakalpakstan,
-  Uzbekistan), transcribed by the authors from the daily operating records and the 2021 vegetation plan
+  Uzbekistan), transcribed by the authors from the daily operating records and the 2020 vegetation plan
   (`DATA/processed/README.md`).

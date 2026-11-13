@@ -1,0 +1,5 @@
+case,rule,days,N,max_pulses_small_per_day,mean_pulses_small_per_day,days_small_pulses_above_N,max_pulses_all_regulators_per_day,max_small_regulators_pulsing_same_day,days_two_or_more_small_pulsing
+q_main,LXB-T000,1830,96,160,55.7551912568306,181,195,4,641
+q_main,LXB-T050,1830,96,160,55.20273224043716,165,191,4,656
+q_main,LXB-CO,1830,96,158,54.8551912568306,165,193,4,654
+q_theta,LXB-T075,1830,96,157,54.80874316939891,164,190,4,661

@@ -1,0 +1,5 @@
+meta:
+  name: demand_area
+  description: "Sensitivity (demand of the users): demand variant B, all outlets by irrigated area"
+overrides:
+  demand_variant: {value: "B", status: setting, source: "B - area"}

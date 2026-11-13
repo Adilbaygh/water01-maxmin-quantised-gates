@@ -74,7 +74,7 @@ numerics:                    # numerical settings
 simulation:                  # Section 2.10
   seed: {value: 20261003, status: setting, source: "base seed of the random streams; season y uses seed + y (common random numbers)"}
   years: {value: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019], status: observed, source: "years of the daily operating records (DATA/processed/rashod_2010_2019_daily.csv)"}
-  vegetation_months: {value: [4, 5, 6, 7, 8, 9], status: observed, source: "vegetation season of the irrigation system (2021 plan and limit, April-September)"}
+  vegetation_months: {value: [4, 5, 6, 7, 8, 9], status: observed, source: "vegetation season of the irrigation system (2020 plan and 2021 limit, April-September)"}
   season_start: {value: "04-01", status: observed, source: "first day of the vegetation season"}
   season_days: {value: 183, status: observed, source: "1 April - 30 September"}
   demand_variant: {value: "A", status: setting, source: "A — observed Abad-Yarmish share; B — area; C — capacity"}

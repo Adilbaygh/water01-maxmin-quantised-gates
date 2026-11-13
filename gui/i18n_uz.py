@@ -158,9 +158,9 @@ UZ = {
     "Season:": "Мавсум:",
     "Open the data folder": "Маълумотлар папкасини очиш",
     "Demand of the outlets": "Сув олгичларнинг талаби",
-    "The demand is derived from the 2021 plan of the Kegeyli system (Equation (1) of the article); the same profile is "
+    "The demand is derived from the 2020 plan of the Kegeyli system (Equation (1) of the article); the same profile is "
     "used in every season. Blank records are treated as days without supply.":
-        "Талаб Кегейли тизимининг 2021 йилги режасидан олинган (мақоланинг (1) тенгламаси); ҳар бир мавсумда бир хил "
+        "Талаб Кегейли тизимининг 2020 йилги режасидан олинган (мақоланинг (1) тенгламаси); ҳар бир мавсумда бир хил "
         "профиль ишлатилади. Бўш ёзувлар таъминотсиз кунлар деб қаралади.",
     "Loading…": "Юкланмоқда…",
     "Loading the season…": "Мавсум юкланмоқда…",

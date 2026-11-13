@@ -1,0 +1,5 @@
+meta:
+  name: demand_scale_080
+  description: "Sensitivity (demand level): demand of every outlet and decade multiplied by 0.8 (scripts/run_sensitivity.py writes the scaled demand file)"
+additions:
+  demand_scale: {value: 0.8, status: assumed, source: "inter-annual variation of the demand (plan of one year applied to every season)"}

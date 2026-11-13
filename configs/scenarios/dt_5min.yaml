@@ -1,0 +1,11 @@
+meta:
+  name: dt_5min
+  description: "Sensitivity (control step): control and plant step of 5 min; settings given in steps are scaled so that their durations, and the rate limit per hour, are those of the 15-min baseline"
+overrides:
+  dt_s: {value: 300.0, status: setting, source: "control and plant step, 5 min (sensitivity of the control step)"}
+  steps_per_day: {value: 288, status: setting, source: "86400 / dt_s"}
+  gate_rate_fraction_per_step: {value: 0.03333333333333333, status: assumed, source: "0.10 per 15 min of the baseline, i.e. the same rate per hour"}
+  execution_lookahead_steps: {value: 24, status: setting, source: "execution LP: rest of the day + 2 h"}
+  execution_fine_steps: {value: 12, status: setting, source: "move blocking: first hour at dt"}
+  execution_block_steps: {value: 12, status: setting, source: "then 1-h blocks"}
+  message_window_steps: {value: 12, status: assumed, source: "1-h window"}

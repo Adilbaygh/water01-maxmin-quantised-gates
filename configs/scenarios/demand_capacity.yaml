@@ -1,0 +1,5 @@
+meta:
+  name: demand_capacity
+  description: "Sensitivity (demand of the users): demand variant C, all outlets by capacity"
+overrides:
+  demand_variant: {value: "C", status: setting, source: "C - capacity"}

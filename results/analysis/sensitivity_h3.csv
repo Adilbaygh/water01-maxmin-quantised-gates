@@ -1,0 +1,10 @@
+case,rule,pulse_only_days,after_day_open_throughout,share_after_open_throughout,lower_bound_holds,upper_bound_holds,sharp_bound_holds,open_at_day_break,share_open_at_day_break,open_at_break_and_after_open_throughout,max_break_steps,sharp_violations_open_start,sharp_violations_closed_start,max_excess_over_sharp_open_start_p,open_start_bound_holds,excess_limit_over_p,regulator_days_x_pos,open_at_day_break_x_pos,start_closures
+q_main,LXB-T000,2784,36,0.01293103448275862,2784,2784,2784,,,,,,,,,,,,
+q_main,LXB-T050,2784,38,0.013649425287356323,2784,2784,2784,,,,,,,,,,,,
+q_main,LXB-CO,2764,42,0.015195369030390739,2764,2763,2759,,,,,,,,,,,,
+q_theta,LXB-T025,2784,40,0.014367816091954023,2784,2784,2782,,,,,,,,,,,,
+q_theta,LXB-T075,2786,39,0.01399856424982053,2786,2786,2785,,,,,,,,,,,,
+q_main_ext,LXB-T050,2784,38,0.013649425287356323,2784,2784,2784,38.0,0.013649425287356323,38.0,38.0,0.0,0.0,0.0,2784.0,0.6666666666666666,8705.0,5633.0,0.0
+q_main_ext,LXB-CO,2764,42,0.015195369030390739,2764,2763,2759,42.0,0.015195369030390739,42.0,35.0,4.0,1.0,0.5303645698393418,2764.0,0.6666666666666666,8684.0,5632.0,0.0
+q_variants,LXB-T050S,2784,38,0.013649425287356323,2784,2784,2784,38.0,0.013649425287356323,38.0,33.0,0.0,0.0,0.0,2784.0,0.6666666666666666,8705.0,5631.0,53.0
+q_variants,LXB-COS,2764,43,0.015557163531114327,2764,2764,2762,44.0,0.015918958031837915,43.0,35.0,0.0,2.0,0.0,2764.0,0.6666666666666666,8686.0,5643.0,46.0

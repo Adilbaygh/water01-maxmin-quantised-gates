@@ -76,7 +76,7 @@ class DataTab(ttk.Frame):
         ttk.Label(right, text=tr("Demand of the outlets"), style="Bold.TLabel").pack(anchor="w")
         self.demand = DataTable(right, height=8, filter_box=False)
         self.demand.pack(fill="both", expand=True)
-        ttk.Label(right, text=tr("The demand is derived from the 2021 plan of the Kegeyli system (Equation (1) of the "
+        ttk.Label(right, text=tr("The demand is derived from the 2020 plan of the Kegeyli system (Equation (1) of the "
                                  "article); the same profile is used in every season. Blank records are treated as "
                                  "days without supply."), style="Muted.TLabel", wraplength=320,
                   justify="left").pack(side="bottom", anchor="w", pady=(PAD, 0), before=self.demand)

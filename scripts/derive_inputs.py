@@ -40,7 +40,7 @@ OUT = ROOT / "results/inputs"
 STEADY_CHANGE = 0.05
 
 
-def days_in_decade(month, decade, year=2021):
+def days_in_decade(month, decade, year=2020):
     return 10 if decade < 3 else calendar.monthrange(year, month)[1] - 20
 
 
@@ -209,7 +209,7 @@ def main():
     a = ap.parse_args()
     load_config()
     disp = pd.read_csv(PROC / "dispatcher_2020_kegeyli.csv", parse_dates=["date"]).sort_values("date")
-    plan = pd.read_csv(PROC / "plan_2021_kegeyli_decadal.csv")
+    plan = pd.read_csv(PROC / "plan_2020_kegeyli_decadal.csv")
     daily = pd.read_csv(PROC / "rashod_2010_2019_daily.csv", parse_dates=["date"])
     annual = pd.read_csv(PROC / "annual_volumes_2010_2019.csv")
     eta = delivery_factor(disp)

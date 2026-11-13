@@ -1,0 +1,52 @@
+# Period-average satisfaction sum V / sum D by calendar dekad, month and season: max-min level of the deliveries (minimum over the outlets) against that of the plans, and the largest difference of the period-average satisfaction of R-1 and of any outlet
+
+| case | rule | period | outlets | blocks | mean_maxmin_V | mean_maxmin_x | mean_diff | min_diff | blocks_below_plan_by_0.01 | max_abs_sat_diff_R1 | mean_abs_sat_diff_R1 | max_abs_sat_diff_any |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| phys | LXB | dekad | six outlets | 180 | 0.8104 | 0.8104 | -3.189e-05 | -0.001163 | 0 | 0.001156 | 3.531e-05 | 147.1 |
+| phys | LXB | dekad | five regulators | 180 | 0.8104 | 0.8104 | -3.043e-05 | -0.001163 | 0 | 0.001156 | 3.531e-05 | 0.001163 |
+| phys | LXB | month | six outlets | 60 | 0.8148 | 0.8148 | -3.361e-05 | -0.0004764 | 0 | 0.0004706 | 3.41e-05 | 3.091 |
+| phys | LXB | month | five regulators | 60 | 0.8148 | 0.8148 | -3.361e-05 | -0.0004764 | 0 | 0.0004706 | 3.41e-05 | 0.0004764 |
+| phys | LXB | season | six outlets | 10 | 0.8342 | 0.8343 | -4.479e-05 | -0.0001145 | 0 | 0.0001503 | 4.646e-05 | 1.069 |
+| phys | LXB | season | five regulators | 10 | 0.8342 | 0.8343 | -4.479e-05 | -0.0001145 | 0 | 0.0001503 | 4.646e-05 | 0.000151 |
+| q_main | LXB | dekad | six outlets | 180 | 0.7663 | 0.8104 | -0.04416 | -1 | 9 | 1 | 0.04836 | 147.1 |
+| q_main | LXB | dekad | five regulators | 180 | 0.7663 | 0.8104 | -0.04416 | -1 | 9 | 1 | 0.04836 | 1 |
+| q_main | LXB | month | six outlets | 60 | 0.8135 | 0.8148 | -0.001357 | -0.007484 | 0 | 0.02 | 0.004833 | 3.092 |
+| q_main | LXB | month | five regulators | 60 | 0.8135 | 0.8148 | -0.001357 | -0.007484 | 0 | 0.02 | 0.004833 | 0.02 |
+| q_main | LXB | season | six outlets | 10 | 0.8341 | 0.8343 | -0.0002028 | -0.001312 | 0 | 0.003911 | 0.002489 | 1.069 |
+| q_main | LXB | season | five regulators | 10 | 0.8341 | 0.8343 | -0.0002028 | -0.001312 | 0 | 0.003911 | 0.002489 | 0.003911 |
+| q_main | LXB-T000 | dekad | six outlets | 180 | 0.8127 | 0.8104 | 0.002328 | -0.002198 | 0 | 1.402 | 0.07283 | 147 |
+| q_main | LXB-T000 | dekad | five regulators | 180 | 0.8128 | 0.8104 | 0.002343 | -0.002198 | 0 | 1.402 | 0.07283 | 1.402 |
+| q_main | LXB-T000 | month | six outlets | 60 | 0.8148 | 0.8148 | -4.351e-05 | -0.000777 | 0 | 0.05699 | 0.01612 | 3.091 |
+| q_main | LXB-T000 | month | five regulators | 60 | 0.8148 | 0.8148 | -3.946e-05 | -0.000777 | 0 | 0.05699 | 0.01612 | 0.05699 |
+| q_main | LXB-T000 | season | six outlets | 10 | 0.8343 | 0.8343 | 5.416e-05 | -0.0001526 | 0 | 0.01048 | 0.009791 | 1.069 |
+| q_main | LXB-T000 | season | five regulators | 10 | 0.8343 | 0.8343 | 5.416e-05 | -0.0001526 | 0 | 0.01048 | 0.009791 | 0.01048 |
+| q_main | LXB-T050 | dekad | six outlets | 180 | 0.8035 | 0.8104 | -0.006962 | -0.09895 | 25 | 1.402 | 0.06523 | 147 |
+| q_main | LXB-T050 | dekad | five regulators | 180 | 0.8035 | 0.8104 | -0.006958 | -0.09895 | 25 | 1.402 | 0.06523 | 1.402 |
+| q_main | LXB-T050 | month | six outlets | 60 | 0.8141 | 0.8148 | -0.0007103 | -0.002626 | 0 | 0.02913 | 0.004409 | 3.091 |
+| q_main | LXB-T050 | month | five regulators | 60 | 0.8141 | 0.8148 | -0.0007103 | -0.002626 | 0 | 0.02913 | 0.004409 | 0.02913 |
+| q_main | LXB-T050 | season | six outlets | 10 | 0.8342 | 0.8343 | -8.097e-05 | -0.0002385 | 0 | 0.002688 | 0.001257 | 1.069 |
+| q_main | LXB-T050 | season | five regulators | 10 | 0.8342 | 0.8343 | -8.097e-05 | -0.0002385 | 0 | 0.002688 | 0.001257 | 0.002688 |
+| q_main | LXB-ES | dekad | six outlets | 180 | 0.809 | 0.8104 | -0.001368 | -0.02325 | 7 | 1.402 | 0.06055 | 147.1 |
+| q_main | LXB-ES | dekad | five regulators | 180 | 0.8091 | 0.8104 | -0.001363 | -0.02325 | 7 | 1.402 | 0.06055 | 1.402 |
+| q_main | LXB-ES | month | six outlets | 60 | 0.8145 | 0.8148 | -0.0003245 | -0.001297 | 0 | 0.02278 | 0.00303 | 3.092 |
+| q_main | LXB-ES | month | five regulators | 60 | 0.8145 | 0.8148 | -0.0003241 | -0.001297 | 0 | 0.02278 | 0.00303 | 0.02278 |
+| q_main | LXB-ES | season | six outlets | 10 | 0.8342 | 0.8343 | -2.572e-05 | -0.0002666 | 0 | 0.0009478 | 0.0006007 | 1.069 |
+| q_main | LXB-ES | season | five regulators | 10 | 0.8342 | 0.8343 | -2.572e-05 | -0.0002666 | 0 | 0.0009478 | 0.0006007 | 0.0009478 |
+| q_main | LXB-CO | dekad | six outlets | 180 | 0.8094 | 0.8104 | -0.001031 | -0.01162 | 2 | 0.2006 | 0.01033 | 147.1 |
+| q_main | LXB-CO | dekad | five regulators | 180 | 0.8094 | 0.8104 | -0.001023 | -0.01162 | 2 | 0.2006 | 0.01033 | 0.2006 |
+| q_main | LXB-CO | month | six outlets | 60 | 0.8147 | 0.8148 | -0.0001364 | -0.001284 | 0 | 0.001862 | 0.0003827 | 3.091 |
+| q_main | LXB-CO | month | five regulators | 60 | 0.8147 | 0.8148 | -0.0001297 | -0.001284 | 0 | 0.001862 | 0.0003827 | 0.001862 |
+| q_main | LXB-CO | season | six outlets | 10 | 0.8343 | 0.8343 | 2.428e-06 | -7.416e-06 | 0 | 0.0001052 | 3.923e-05 | 1.069 |
+| q_main | LXB-CO | season | five regulators | 10 | 0.8343 | 0.8343 | 2.428e-06 | -7.416e-06 | 0 | 0.0001052 | 3.923e-05 | 0.0001052 |
+| q_theta | LXB-T025 | dekad | six outlets | 180 | 0.8065 | 0.8104 | -0.003873 | -0.09683 | 7 | 1.402 | 0.06875 | 147 |
+| q_theta | LXB-T025 | dekad | five regulators | 180 | 0.8066 | 0.8104 | -0.003849 | -0.09683 | 7 | 1.402 | 0.06875 | 1.402 |
+| q_theta | LXB-T025 | month | six outlets | 60 | 0.8147 | 0.8148 | -0.0001388 | -0.0007774 | 0 | 0.0542 | 0.01181 | 3.091 |
+| q_theta | LXB-T025 | month | five regulators | 60 | 0.8147 | 0.8148 | -0.0001378 | -0.0007774 | 0 | 0.0542 | 0.01181 | 0.0542 |
+| q_theta | LXB-T025 | season | six outlets | 10 | 0.8343 | 0.8343 | 4.517e-05 | -9.616e-05 | 0 | 0.00657 | 0.005656 | 1.069 |
+| q_theta | LXB-T025 | season | five regulators | 10 | 0.8343 | 0.8343 | 4.517e-05 | -9.616e-05 | 0 | 0.00657 | 0.005656 | 0.00657 |
+| q_theta | LXB-T075 | dekad | six outlets | 180 | 0.7963 | 0.8104 | -0.01416 | -0.1605 | 58 | 1.402 | 0.06759 | 147 |
+| q_theta | LXB-T075 | dekad | five regulators | 180 | 0.7963 | 0.8104 | -0.01416 | -0.1605 | 58 | 1.402 | 0.06759 | 1.402 |
+| q_theta | LXB-T075 | month | six outlets | 60 | 0.8091 | 0.8148 | -0.005731 | -0.02751 | 13 | 0.02751 | 0.005983 | 3.092 |
+| q_theta | LXB-T075 | month | five regulators | 60 | 0.8091 | 0.8148 | -0.005731 | -0.02751 | 13 | 0.02751 | 0.005983 | 0.02751 |
+| q_theta | LXB-T075 | season | six outlets | 10 | 0.8332 | 0.8343 | -0.00104 | -0.00541 | 0 | 0.005532 | 0.003969 | 1.069 |
+| q_theta | LXB-T075 | season | five regulators | 10 | 0.8332 | 0.8343 | -0.00104 | -0.00541 | 0 | 0.005532 | 0.003969 | 0.005532 |

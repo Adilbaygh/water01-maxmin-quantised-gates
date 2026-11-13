@@ -1,0 +1,7 @@
+meta:
+  name: r1_april_180
+  description: "Sensitivity (R-1 demand in the first decade of April): the decadal demand of R-1 in 1-10 April multiplied by 1.8; window 1 April - 10 May, which contains the daily planning windows of all April days (scripts/run_sensitivity.py writes the demand file)"
+overrides:
+  season_days: {value: 40, status: setting, source: "1 April - 10 May (sensitivity window of the April demand)"}
+additions:
+  demand_r1_april_factor: {value: 1.8, status: assumed, source: "demand of R-1 in the first decade of April (not verified in the field)"}

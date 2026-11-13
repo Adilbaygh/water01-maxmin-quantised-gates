@@ -1,0 +1,5 @@
+meta:
+  name: bias_tailwater_high
+  description: "Sensitivity (plant/controller mismatch): tail-water levels of the five regulators in the plant 0.3 m higher than in the controller's model (scripts/run_sensitivity.py builds the plant node with the shifted levels)"
+additions:
+  plant_tailwater_offset_m: {value: 0.3, status: assumed, source: "bias of the assumed tail-water levels (not in the passport)"}

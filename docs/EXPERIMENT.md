@@ -76,6 +76,24 @@ Tolerances: 10⁻⁶ m³ for volumes, 10⁻¹² for levels of satisfaction.
 The bounds for V̂ use the step volumes at the levels estimated by the controller (equal to the plant levels in the
 chain Q), those for V the step volumes at the plant levels.
 
+## Sensitivity cases (`scripts/run_sensitivity.py`, `scripts/analyse_sensitivity.py`)
+
+Twenty-two cases, 480 runs, quantised actuator alone, each with the rules named in `scripts/run_sensitivity.py`:
+
+| Group | Cases | Purpose |
+|---|---|---|
+| R1 | `q_r1apr_050`, `_100`, `_150`, `_180`, `_200` | demand of R-1 in 1–10 April × 0.5, 1, 1.5, 1.8, 2.0 (scenario addition `demand_r1_april_factor`), windows 1 April–10 May (`season_days` 40), evaluated in April; the April days of `q_r1apr_100` reproduce those of `q_main` |
+| DT | `q_dt5`, `q_dt30` | control step of 5 and 30 min; the settings given in steps keep their durations and the rate limit per hour; 30 min keeps two hydraulic steps of 15 min |
+| RULES | `q_main_ext`, `q_variants` | re-runs of LXB-T050 and LXB-CO with the gate columns (opening at the day break, movements, travel); the variants LXB-T050S, LXB-COS, LXB-ESM and LXB-ESL of `scripts/rules_variants.py` |
+| GATE | `q_tw_high`, `q_bias_cd_low`, `q_bias_cd_high`, `q_bias_tw_high`, `q_bias_tw_low`, and `q_bias_*_apr` (direct execution, April windows) | tail-water levels + 0.3 m in plant and controller (with − 0.3 m, the discharge of the fully open Abad-Yarmish gate is neither concave nor convex in the level and the controller model of the core cannot be built); plant-only biases: discharge of the regulators × 0.8 / 1.2 (`outlet_rating_factors`, equivalent to C_d ± 20% by relation (2)) and tail-water levels ± 0.3 m (`plant_tailwater_offset_m`) |
+| DEMAND | `q_dem_B`, `q_dem_C`, `q_dem_080`, `q_dem_120` | demand variants B (area) and C (capacity); demand of every outlet × 0.8 / 1.2 (`demand_scale`) |
+
+The analysis (`scripts/analyse_sensitivity.py`) also computes from the stored runs the timing of the deliveries
+(longest run of days without water for a positive plan, first-in-first-out delay of the cumulative delivery behind the
+cumulative plan, cumulative delivery ahead of the plan and backlog), the period-average max–min level over calendar
+dekads, months and seasons, the gate state at the day break on the pulse-only regulator-days, the pool level on the
+deficit days and the pulses of the four small regulators per day.
+
 ## Verification of the plant (`results/verification/`)
 
 `scripts/verification_convergence.py` (grid and time step, with and without the distributed loss),

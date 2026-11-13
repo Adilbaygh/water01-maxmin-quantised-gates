@@ -1,0 +1,7 @@
+meta:
+  name: bias_cd_high_april
+  description: "Sensitivity (plant/controller mismatch, direct execution in April): discharge coefficient of the five regulators in the plant 20% higher than in the controller's model; window 1 April - 10 May"
+overrides:
+  season_days: {value: 40, status: setting, source: "1 April - 10 May (window of the April exclusions)"}
+additions:
+  outlet_rating_factors: {value: [1.2, 1.2, 1.2, 1.2, 1.2], status: assumed, source: "actual / modelled regulator discharge = 0.744 / 0.62 (bias of the uncalibrated coefficient)"}
