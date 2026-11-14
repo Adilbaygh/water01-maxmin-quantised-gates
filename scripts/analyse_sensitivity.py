@@ -24,7 +24,14 @@ Parts:
   rules   closure at the start of the day (LXB-T050S, LXB-COS), the equal split with the fewest openings (LXB-ESM)
           and the equal split with a level cap and a trimming step (LXB-ESL) against LXB-T050, LXB-CO and LXB-ES.
   coupling  pulses per day of the four small regulators against the N steps of a day (one shared pulse per step).
-Usage: python scripts/analyse_sensitivity.py [--parts coupling,shift,fair,h3,level,dt,r1,gate,demand,rules]
+  schedule  the recorded daily pulse counts of the four small regulators scheduled on one shared pulse per step by
+            the earliest-deadline rule (quantmaxmin.execution.shared_pulse_schedule): days within the N steps, largest
+            deviation of the cumulative pulses from the uniform share of the day.
+  benchmark period-average max-min level of the plans and deliveries over calendar dekads, months and seasons against
+            the period level with perfect foresight under the same daily node volumes, demands and outlet limits
+            (quantmaxmin.allocation.period_level, checked by its cut bound).
+Usage: python scripts/analyse_sensitivity.py [--parts coupling,schedule,benchmark,shift,fair,h3,level,dt,r1,gate,demand,
+       rules]
 """
 import argparse
 import math
@@ -38,7 +45,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analysis_common import (OUT, REGULATORS, ROOT, YEARS, Quanta, load, markdown, node_water,  # noqa: E402
                              regulator_days)
 from analyse_theorems import dekad_errors  # noqa: E402
-from quantmaxmin.allocation import continuous_level, quantised_level  # noqa: E402
+from quantmaxmin.allocation import continuous_level, period_level, period_level_cut, quantised_level  # noqa: E402
+from quantmaxmin.execution import shared_pulse_schedule  # noqa: E402
 
 from water01.domain.passport import USERS, value  # noqa: E402
 from water01.hydraulics.node import DustlikNode  # noqa: E402
@@ -627,7 +635,101 @@ def part_coupling():
          "Kanly-Yab, K-2): if they had to share one pulse per step, a day needs at most N = 96 pulses")
 
 
-PARTS = {"coupling": part_coupling, "shift": part_shift, "fair": part_fair, "h3": part_h3, "level": part_level, "dt": part_dt, "r1": part_r1,
+def part_schedule():
+    """The recorded daily pulse counts of the four small regulators on one pulse per step shared by all of them: the
+    earliest-deadline rule with the counts of the day known at its start, each spread uniformly over the N steps."""
+    small = REGULATORS[1:]
+    k = len(small) + 1                                       # the four regulators and the idle state
+    rows = []
+    for case, m in (("q_main", "LXB-T000"), ("q_main", "LXB-T050"), ("q_main", "LXB-CO"), ("q_theta", "LXB-T075")):
+        df = load(case, m)
+        if df.empty:
+            continue
+        N = 96
+        c = df[[f"pulses_{u}" for u in small]].to_numpy(int)
+        dev, seen = [], {}
+        for row in c:
+            if row.sum() > N:
+                continue
+            key = tuple(row)
+            if key not in seen:
+                u, d = shared_pulse_schedule(np.tile(row[:, None] / N, (1, N)))
+                if not np.array_equal(u.sum(axis=1), row) or u.sum(axis=0).max() > 1:
+                    raise RuntimeError(f"{case} {m}: schedule does not deliver the counts {row}")
+                seen[key] = d
+            dev.append(seen[key])
+        rows.append({"case": case, "rule": m, "days": int(len(df)), "N": N,
+                     "days_within_N": int((c.sum(axis=1) <= N).sum()), "days_above_N": int((c.sum(axis=1) > N).sum()),
+                     "max_pulses_per_day": int(c.sum(axis=1).max()), "distinct_count_vectors": len(seen),
+                     "max_deviation_pulses": float(max(dev)), "bound_pulses": 1.0 - 1.0 / (2 * k - 2)})
+    save(pd.DataFrame(rows), "sensitivity_schedule", "Recorded daily pulse counts of the four small regulators on one "
+         "shared pulse per step: earliest-deadline schedule of the days with at most N = 96 pulses (counts of the day "
+         "known at its start and spread uniformly over the day); largest deviation of the cumulative pulses of a "
+         "regulator from its uniform share, against the bound 1 − 1/(2k − 2) with k = 5 (four regulators and the idle "
+         "state)")
+
+
+BENCH = ("LXB", "LXB-T000", "LXB-T050", "LXB-ES", "LXB-CO")
+
+
+def part_benchmark():
+    """Period-average max-min level of the plans and deliveries of q_main against the period level with perfect
+    foresight under the same daily node volumes A, demands D and daily outlet limits (no water moved between days)."""
+    load_config(scenario="normal")
+    C = np.asarray(value("outlet_capacity_m3s"), float) * 86400
+    blocks = []
+    for y in YEARS:
+        dates, A, D = node_water(y)
+        frames = {m: load("q_main", m, [y]) for m in BENCH}
+        for m, f in frames.items():
+            if np.abs(f[[f"D_{u}" for u in USERS]].to_numpy().T - D).max() > 1e-6:
+                raise RuntimeError(f"q_main {m} {y}: stored demands differ from node_water")
+        d = pd.DatetimeIndex(dates)
+        keys = {"dekad": d.month * 10 + np.where(d.day <= 10, 0, np.where(d.day <= 20, 1, 2)),
+                "month": d.month, "season": np.zeros(len(d), int)}
+        for period, key in keys.items():
+            for kk in np.unique(key):
+                ix = np.flatnonzero(key == kk); B = D[:, ix].sum(axis=1); pos = B > 0
+                lam, _ = period_level(D[:, ix], A[ix], C)
+                cut, S = period_level_cut(D[:, ix], A[ix], C)
+                if abs(lam - cut) > 1e-8:
+                    raise RuntimeError(f"{y} {period} {kk}: LP {lam} differs from the cut bound {cut}")
+                rec = {"year": y, "period": period, "start": d[ix[0]].date(), "end": d[ix[-1]].date(), "days": len(ix),
+                       "lambda_opt": lam, "lambda_cut": cut, "limiting_outlets": ", ".join(USERS[j] for j in S)}
+                for m, f in frames.items():
+                    x = f[[f"x_{u}" for u in USERS]].to_numpy()[ix].T; V = f[[f"V_{u}" for u in USERS]].to_numpy()[ix].T
+                    sx = x.sum(axis=1)[pos] / B[pos]; sV = V.sum(axis=1)[pos] / B[pos]
+                    rec[f"plan_{m}"] = float(sx.min()); rec[f"delivered_{m}"] = float(sV.min())
+                    if m == "LXB-CO":
+                        users = [u for u, ok in zip(USERS, pos) if ok]
+                        rec["plan_lowest_outlet"] = users[int(np.argmin(sx))]
+                        rec["plan_highest_satisfaction"] = float(sx.max())
+                blocks.append(rec)
+    bl = pd.DataFrame(blocks)
+    save(bl, "sensitivity_benchmark_blocks", "Period level with perfect foresight (lambda_opt, LP; lambda_cut, its cut "
+         "bound) and period-average max-min level of the plans and deliveries of q_main for every calendar dekad, month "
+         "and season")
+    rows = []
+    for period in ("dekad", "month", "season"):
+        g = bl[bl.period == period]
+        for m in BENCH:
+            plan_gap = g.lambda_opt - g[f"plan_{m}"]; exe = g[f"plan_{m}"] - g[f"delivered_{m}"]
+            tot = g.lambda_opt - g[f"delivered_{m}"]
+            rows.append({"period": period, "rule": m, "blocks": int(len(g)), "max_planning_gap": float(plan_gap.max()),
+                         "mean_planning_gap": float(plan_gap.mean()), "max_execution_shortfall": float(exe.max()),
+                         "max_total_gap": float(tot.max()), "mean_total_gap": float(tot.mean())})
+    save(pd.DataFrame(rows), "sensitivity_benchmark", "Period-average max-min level of the plans and deliveries of "
+         "q_main below the period level with perfect foresight: planning gap (lambda_opt − plan), execution shortfall "
+         "(plan − delivery) and total gap, largest and mean over the calendar dekads, months and seasons")
+    s = bl[bl.period == "season"][["year", "lambda_opt", "plan_LXB-CO", "delivered_LXB-CO", "plan_lowest_outlet",
+                                   "plan_highest_satisfaction", "limiting_outlets"]].copy()
+    s["planning_gap"] = s.lambda_opt - s["plan_LXB-CO"]
+    save(s, "sensitivity_benchmark_seasons", "Seasons: period level with perfect foresight, period-average max-min level "
+         "of the plan and of the deliveries of LXB-CO, the outlet with the lowest seasonal satisfaction of the plan and "
+         "the highest seasonal satisfaction of an outlet under the plan")
+
+
+PARTS = {"coupling": part_coupling, "schedule": part_schedule, "benchmark": part_benchmark, "shift": part_shift, "fair": part_fair, "h3": part_h3, "level": part_level, "dt": part_dt, "r1": part_r1,
          "gate": part_gate, "demand": part_demand, "rules": part_rules}
 
 

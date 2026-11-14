@@ -9,11 +9,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from quantmaxmin.allocation import (continuous_level, epsilon_star, price_of_indivisibility,  # noqa: E402
-                                    quantised_level, quantised_level_milp, required_volume, whole_step_level,
-                                    whole_step_level_enumerated, whole_step_lower_bound)
+from quantmaxmin.allocation import (continuous_level, epsilon_star, period_level, period_level_cut,  # noqa: E402
+                                    price_of_indivisibility, quantised_level, quantised_level_milp, required_volume,
+                                    whole_step_level, whole_step_level_enumerated, whole_step_lower_bound)
 from quantmaxmin.execution import (Actuator, carry_over, direct_execution_day, equal_split_day,  # noqa: E402
-                                   equal_split_m, exclusion_threshold, theta_rule_day)
+                                   equal_split_m, exclusion_threshold, shared_pulse_schedule, theta_rule_day)
 
 N = 96
 TOL = 1e-9
@@ -378,3 +378,36 @@ def test_equal_split_with_a_trimming_step():
         assert ok and abs(V - x) <= g_max / 2 + 1e-9
         n_cases += 1
     assert n_cases > 2000
+
+
+# Accounting periods and shared pulses ----------------------------------------------------------------------------------
+def test_period_level_equals_its_cut_bound():
+    """The linear programme of the period level and the max-flow/min-cut bound agree (and a hand-solved example)."""
+    lam, y = period_level([[10.0, 10.0], [10.0, 1.0]], [10.0, 11.0], [100.0, 100.0])
+    assert lam == pytest.approx(21 / 31, abs=1e-9)
+    assert y.sum(axis=0) == pytest.approx([10.0, 11.0], abs=1e-6)
+    rng = np.random.default_rng(31)
+    for _ in range(300):
+        J = int(rng.integers(1, 7)); T = int(rng.integers(1, 15))
+        D = rng.uniform(0.0, 10.0, (J, T)) * (rng.random((J, T)) < 0.8)
+        W = rng.uniform(0.0, 4.0 * J, T); C = rng.uniform(2.0, 12.0, J)
+        lam, y = period_level(D, W, C)
+        cut, _ = period_level_cut(D, W, C)
+        assert lam == pytest.approx(cut, abs=1e-8)
+        assert np.all(y <= np.minimum(D, C[:, None]) + 1e-7) and np.all(y.sum(axis=0) <= W + 1e-7)
+
+
+def test_shared_pulse_schedule_stays_within_tijdemans_bound():
+    """One pulse per step for several outlets: at most one outlet per step, every outlet within 1 - 1/(2k - 2) of its
+    cumulative share (k outlets plus the idle state), and integer daily totals delivered exactly."""
+    rng = np.random.default_rng(32)
+    for _ in range(400):
+        J = int(rng.integers(1, 7)); n = int(rng.integers(2, 97))
+        a = rng.dirichlet(np.ones(J + 1), size=n).T[:-1]
+        u, dev = shared_pulse_schedule(a)
+        assert set(np.unique(u)) <= {0, 1} and np.all(u.sum(axis=0) <= 1)
+        assert dev <= 1.0 - 1.0 / (2 * (J + 1) - 2) + 1e-9
+    for _ in range(200):
+        J = int(rng.integers(1, 5)); c = rng.multinomial(int(rng.integers(0, N + 1)), np.ones(J + 1) / (J + 1))[:J]
+        u, dev = shared_pulse_schedule(np.tile(c[:, None] / N, (1, N)))
+        assert np.array_equal(u.sum(axis=1), c) and dev <= 1.0 - 1.0 / (2 * (J + 1) - 2) + 1e-9

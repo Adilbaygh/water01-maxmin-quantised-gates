@@ -1,9 +1,10 @@
 """Quantised max-min delivery at a canal node (article, Sections 2-3).
 
 allocation -- continuous level lambda*, minimum-delivery level lambda_q, price of indivisibility and whole-step level
-              lambda_v (Theorem 2);
+              lambda_v (Theorem 2), and the period level with perfect foresight with its cut bound;
 execution  -- an abstract quantised actuator and the execution rules of Theorems 1, 3 and 4 (direct execution, equal
-              split, theta pulse rule, carry-over), used to check the theorems on random instances.
+              split, theta pulse rule, carry-over), used to check the theorems on random instances, and the
+              earliest-deadline schedule of one pulse per step shared by several outlets.
 The package depends only on NumPy and SciPy; the closed-loop simulation core is the package water01.
 """
-__version__ = "1.2.0"
+__version__ = "1.3.0"

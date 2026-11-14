@@ -19,7 +19,16 @@ sum_j v_j <= (lambda_q - tau) * D_q(tau), where D_q(tau) is the demand of the ou
 a gate whose discharge is proportional to the opening and that starts the day closed has the grid
 S_j = {0} U {q_j + m v_j, m = 0, 1, ...}, v_j being the volume of one resolution step; whole_step_level computes
 lambda_v for such grids, an outlet with v_j = 0 taking every volume of at least q_j.
+
+Accounting periods. Over a period of days t with node volumes W_t, demands D_jt and daily outlet limits C_j, the
+period level with perfect foresight is the largest lambda <= 1 for which continuous volumes 0 <= y_jt <= U_jt =
+min{D_jt, C_j} with sum_j y_jt <= W_t give every outlet with a positive period demand B_j = sum_t D_jt at least
+lambda B_j (period_level, a linear programme). Water is not moved between days. By the max-flow/min-cut theorem on
+the network source -> day (W_t) -> outlet (U_jt) -> sink (lambda B_j), it equals the minimum over the nonempty sets S
+of such outlets of sum_t min{W_t, sum_{j in S} U_jt} / sum_{j in S} B_j, capped at 1 (period_level_cut).
 """
+from itertools import combinations
+
 import numpy as np
 
 
@@ -187,3 +196,56 @@ def daily_prices(V, D, q):
     lam = np.array([continuous_level(V[p], D[:, p]) for p in range(V.size)])
     lq = np.array([quantised_level(V[p], D[:, p], q[:, p]) for p in range(V.size)])
     return lam, lq, lam - lq
+
+
+def _period_arrays(D, W, C):
+    D = np.asarray(D, float); W = np.asarray(W, float)
+    if D.ndim != 2 or W.shape != (D.shape[1],):
+        raise ValueError("D must be [outlets x days] and W [days]")
+    if np.any(D < 0) or np.any(W < 0):
+        raise ValueError("D and W must be non-negative")
+    C = np.full(D.shape[0], np.inf) if C is None else np.asarray(C, float)
+    return D, W, np.minimum(D, C[:, None])
+
+
+def period_level(D, W, C=None):
+    """Period level with perfect foresight: max lambda <= 1 subject to 0 <= y_jt <= min{D_jt, C_j},
+    sum_j y_jt <= W_t and sum_t y_jt >= lambda sum_t D_jt for every outlet with a positive period demand
+    (HiGHS; volumes scaled by the largest demand). Returns (lambda, y [outlets x days])."""
+    from scipy.optimize import linprog
+    from scipy.sparse import lil_matrix
+    D, W, U = _period_arrays(D, W, C)
+    J, T = D.shape; B = D.sum(axis=1); pos = np.flatnonzero(B > 0)
+    if pos.size == 0:
+        return 1.0, np.zeros_like(D)
+    s = float(D.max())
+    A = lil_matrix((T + pos.size, J * T + 1))
+    for t in range(T):
+        A[t, np.arange(J) * T + t] = 1.0
+    for r, j in enumerate(pos):
+        A[T + r, j * T:(j + 1) * T] = -1.0 / B[j] * s
+        A[T + r, J * T] = 1.0
+    b = np.r_[W / s, np.zeros(pos.size)]
+    c = np.zeros(J * T + 1); c[-1] = -1.0
+    bounds = [(0.0, float(u) / s) for u in U.ravel()] + [(0.0, 1.0)]
+    res = linprog(c, A_ub=A.tocsr(), b_ub=b, bounds=bounds, method="highs",
+                  options={"primal_feasibility_tolerance": 1e-10, "dual_feasibility_tolerance": 1e-10})
+    if not res.success:
+        raise RuntimeError(res.message)
+    return float(res.x[-1]), res.x[:-1].reshape(J, T) * s
+
+
+def period_level_cut(D, W, C=None):
+    """The period level from the cut condition: min{1, min over nonempty sets S of outlets with a positive period
+    demand of sum_t min{W_t, sum_{j in S} U_jt} / sum_{j in S} B_j}. Returns (lambda, S); S is () when the level is 1.
+    Enumerates 2^n - 1 sets; for checks of period_level."""
+    D, W, U = _period_arrays(D, W, C)
+    B = D.sum(axis=1); pos = [j for j in range(D.shape[0]) if B[j] > 0]
+    best, arg = 1.0, ()
+    for r in range(1, len(pos) + 1):
+        for S in combinations(pos, r):
+            S = list(S)
+            ratio = float(np.minimum(W, U[S].sum(axis=0)).sum() / B[S].sum())
+            if ratio < best:
+                best, arg = ratio, tuple(S)
+    return best, arg

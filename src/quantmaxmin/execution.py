@@ -111,3 +111,32 @@ def period_satisfaction(V, D, T):
         return np.array([])
     Vb = V[:nb * T].reshape(nb, T).sum(axis=1); Db = D[:nb * T].reshape(nb, T).sum(axis=1)
     return np.minimum(1.0, Vb / Db)
+
+
+def shared_pulse_schedule(a):
+    """One pulse per step shared by several outlets (the chairman assignment problem). a[j, t] >= 0 is the share of the
+    pulse of step t planned for outlet j, with sum_j a[j, t] <= 1; the rest of a step is idle and counts as a further
+    state, so that k = J + 1 states fill every step. With the shares of the horizon known in advance, the
+    earliest-deadline rule of Tijdeman (1980) serves in step t, among the states whose service would not run more than
+    1 - 1/(2k - 2) ahead of their cumulative share, the one whose cumulative share first exceeds its service by that
+    bound; every state then stays within 1 - 1/(2k - 2) of its cumulative share. Returns (u [J x N] in {0, 1}, largest
+    |cumulative service - cumulative share| over the outlets and steps)."""
+    a = np.asarray(a, float)
+    if a.ndim != 2 or a.shape[0] < 1 or np.any(a < -1e-12) or np.any(a.sum(axis=0) > 1 + 1e-9):
+        raise ValueError("a must be [outlets x steps], non-negative, with column sums of at most 1")
+    full = np.vstack([np.maximum(a, 0.0), np.maximum(0.0, 1.0 - a.sum(axis=0))])
+    k, n = full.shape; eps = 1.0 / (2 * k - 2)
+    P = np.cumsum(full, axis=1); served = np.zeros(k); u = np.zeros((k, n), int)
+    for t in range(n):
+        best = None
+        for i in range(k):
+            if P[i, t] - served[i] < eps - 1e-12:
+                continue                                    # serving i would run more than 1 - eps ahead
+            later = np.flatnonzero(P[i, t:] >= served[i] + 1.0 - eps - 1e-12)
+            deadline = t + int(later[0]) if later.size else n
+            if best is None or deadline < best[0]:
+                best = (deadline, i)
+        i = best[1] if best is not None else int(np.argmax(P[:, t] - served))
+        u[i, t] = 1; served[i] += 1
+    dev = float(np.abs(np.cumsum(u[:-1], axis=1) - P[:-1]).max())
+    return u[:-1], dev

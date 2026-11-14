@@ -30,6 +30,7 @@
 !/scripts/check_swmm_benchmark.py
 !/scripts/gate_activity.py
 !/scripts/check_residual_cap.py
+!/scripts/check_esl_last_step.py
 !/scripts/rules_variants.py
 !/scripts/run_sensitivity.py
 !/scripts/analyse_sensitivity.py
